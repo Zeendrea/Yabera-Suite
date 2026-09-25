@@ -10,11 +10,14 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findAllByOrderByCreatedAtDesc();
+
+        List<Booking> findByStatusAndCreatedAtBefore(BookingStatus status, Instant cutoff);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.status IN :statuses AND b.checkIn < :checkOut AND b.checkOut > :checkIn")

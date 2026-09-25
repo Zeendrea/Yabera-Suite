@@ -62,6 +62,15 @@ public class Booking {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "room_total")
+    private Integer roomTotal;
+
+    @Column(name = "extra_guest_total")
+    private Integer extraGuestTotal;
+
+    @Column(name = "total_amount")
+    private Integer totalAmount;
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -167,5 +176,29 @@ public class Booking {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Integer getRoomTotal() {
+        return roomTotal;
+    }
+
+    public void setRoomTotal(Integer roomTotal) {
+        this.roomTotal = roomTotal;
+    }
+
+    public Integer getExtraGuestTotal() {
+        return extraGuestTotal;
+    }
+
+    public void setExtraGuestTotal(Integer extraGuestTotal) {
+        this.extraGuestTotal = extraGuestTotal;
+    }
+
+    public Integer getTotalAmount() {
+        return totalAmount;
+    }
+
+    public void setTotalAmount(Integer totalAmount) {
+        this.totalAmount = totalAmount;
     }
 }

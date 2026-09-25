@@ -1,4 +1,12 @@
-export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED'
+export type BookingStatus =
+  | 'AWAITING_PAYMENT'
+  | 'PAYMENT_SUBMITTED'
+  | 'PAYMENT_VERIFIED'
+  | 'CONFIRMED'
+  | 'EXPIRED'
+  | 'REJECTED'
+  | 'PENDING'
+  | 'CANCELLED'
 
 export type UnavailableType = 'BOOKED' | 'PENDING' | 'BLOCKED'
 
@@ -24,6 +32,9 @@ export interface Booking {
   checkIn: string
   checkOut: string
   nights: number
+  roomTotal: number | null
+  extraGuestTotal: number | null
+  totalAmount: number | null
   message?: string | null
   status: BookingStatus
   createdAt: string

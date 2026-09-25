@@ -28,8 +28,12 @@ import java.util.Locale;
 /**
  * Sends booking notification emails and records every attempt in email_log.
  *
- * All send methods are {@code @Async} so they never block the HTTP request
+ * <p>All send methods are {@code @Async} so they never block the HTTP request
  * thread. Status is recorded as PENDING → SENT or FAILED.
+ *
+ * <p>Payment flow: a {@code BOOKING_REQUEST_RECEIVED} email is the only email
+ * type that carries the PSBank QR payment code (inline + attachment). Confirmed
+ * and rejected emails never include payment collateral.
  */
 @Service
 public class EmailService {
@@ -64,9 +68,14 @@ public class EmailService {
 
     @Async
     public void sendBookingConfirmed(Booking booking) {
+      try {
+        log.info("Preparing confirmation email for booking {}", booking.getBookingReference());
         String subject = "Booking Confirmed";
         send(booking, subject, EmailType.BOOKING_CONFIRMED,
-                buildConfirmedHtml(booking));
+            buildConfirmedHtml(booking));
+      } catch (RuntimeException ex) {
+        log.error("Could not prepare confirmation email for booking {}", booking.getBookingReference(), ex);
+      }
     }
 
     @Async
@@ -94,11 +103,18 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(html, true); // true = isHtml
 
+            // Only booking-request emails carry the PSBank payment QR — never on
+            // confirmation or rejection emails.
             if (type == EmailType.BOOKING_REQUEST_RECEIVED) {
                 Resource qrResource = resolveQrCodeResource();
                 if (qrResource != null) {
                     helper.addInline("qrpayment", qrResource, "image/jpeg");
                     helper.addAttachment("PSBank-QR-Payment.jpg", qrResource);
+                  log.info("Attached payment QR for booking {} from {}", booking.getBookingReference(), qrResource.getDescription());
+                } else {
+                    log.warn("Booking request email for {} sent WITHOUT a QR code image — "
+                            + "guest will not see a scannable payment option.",
+                            booking.getBookingReference());
                 }
             }
 
@@ -128,16 +144,17 @@ public class EmailService {
         String bookingRef = b.getBookingReference();
         String roomTotalText = formatPeso(price.roomTotal);
         String extraGuestFeeText = formatPeso(price.extraGuestTotal);
+        String nightsText = price.nights + (price.nights == 1 ? " night" : " nights");
         String totalText = formatPeso(price.total);
 
-        String qrMarkup = "<img src=\"cid:qrpayment\" alt=\"PSBank QR Payment\" style=\"display:block;width:180px;max-width:100%;height:auto;margin:0 auto 10px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;\">";
+        String qrMarkup = "<img src=\"cid:qrpayment\" alt=\"Payment QR code\" width=\"220\" style=\"display:block;width:220px;max-width:100%;height:auto;margin:0 auto 10px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;\">";
 
         return wrap(propertyName, """
                 <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 12px">
                   Hello <strong>%s</strong>,
                 </p>
                 <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 20px">
-                  Thank you for your booking request. We have received your request and are ready to confirm it once payment is verified.
+                  Thank you for your booking request. We have received your request for:
                 </p>
 
                 <table width="100%%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;border-collapse:separate;border-spacing:0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
@@ -159,18 +176,27 @@ public class EmailService {
                   </tr>
                 </table>
 
+                <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px;margin:0 0 24px;color:#9a3412">
+                  <p style="margin:0;font-size:16px;line-height:1.6">Your booking is currently <strong>awaiting payment</strong>.</p>
+                  <p style="margin:6px 0 0;font-size:14px;line-height:1.6">This request is not confirmed yet.</p>
+                </div>
+
                 <table width="100%%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;border-collapse:separate;border-spacing:0;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fffaf5">
                   <tr>
                     <td colspan="2" style="padding:14px 16px;background:#f3ede7;border-bottom:1px solid #e5e7eb">
-                      <span style="color:#1f2937;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Price Breakdown</span>
+                      <span style="color:#1f2937;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Payment Breakdown</span>
                     </td>
                   </tr>
                   <tr>
-                    <td style="padding:12px 16px;color:#4b5563;font-size:15px">Room total</td>
+                    <td style="padding:12px 16px;color:#4b5563;font-size:15px">Room rate</td>
                     <td style="padding:12px 16px;color:#1f2937;font-size:15px;font-weight:700;text-align:right">%s</td>
                   </tr>
                   <tr>
-                    <td style="padding:12px 16px;color:#4b5563;font-size:15px;border-top:1px solid #f0e7df">Extra guest fees (₱300/night after 2 guests)</td>
+                    <td style="padding:12px 16px;color:#4b5563;font-size:15px;border-top:1px solid #f0e7df">Number of nights</td>
+                    <td style="padding:12px 16px;color:#1f2937;font-size:15px;font-weight:700;text-align:right;border-top:1px solid #f0e7df">%s</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:12px 16px;color:#4b5563;font-size:15px;border-top:1px solid #f0e7df">Extra guest fee</td>
                     <td style="padding:12px 16px;color:#1f2937;font-size:15px;font-weight:700;text-align:right;border-top:1px solid #f0e7df">%s</td>
                   </tr>
                   <tr>
@@ -184,26 +210,23 @@ public class EmailService {
                 </table>
 
                 <div style="background:#fff7f1;border:1px solid #f3d2bc;border-radius:12px;padding:20px 16px 18px;margin:0 0 24px;text-align:center">
-                  <p style="margin:0 0 12px;color:#7c2d12;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Scan to Pay via PSBank (QR Ph)</p>
+                  <p style="margin:0 0 12px;color:#7c2d12;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Payment</p>
+                  <p style="margin:0 0 14px;color:#4b5563;font-size:15px;line-height:1.6">Please scan the QR code below to complete your payment.</p>
                   %s
-                  <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6">
-                    Scannable using any InstaPay-enabled bank or e-wallet (GCash, Maya, Seabank, BDO, BPI, etc.)
-                  </p>
                 </div>
 
-                <div style="background:#f3f4f6;border-radius:10px;padding:18px 16px;margin:0 0 24px;border:1px solid #e5e7eb">
-                  <p style="margin:0 0 12px;color:#1f2937;font-size:16px;font-weight:700">Payment Instructions</p>
+                <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:18px 16px;margin:0 0 24px">
+                  <p style="margin:0 0 10px;color:#9a3412;font-size:16px;font-weight:700">Payment First Policy</p>
+                  <p style="margin:0 0 10px;color:#7c2d12;font-size:15px;line-height:1.6"><strong>Payment must be completed within 24 hours after submitting your booking request.</strong></p>
+                  <p style="margin:0 0 12px;color:#4b5563;font-size:15px;line-height:1.6">Your booking is not confirmed until payment has been verified by Yabera Suite.</p>
+                  <p style="margin:0 0 8px;color:#1f2937;font-size:15px;font-weight:700">How to complete your payment:</p>
                   <ol style="margin:0;padding-left:20px;color:#4b5563;font-size:15px;line-height:1.8">
-                    <li>Scan the attached PSBank QR code using any InstaPay-enabled bank or e-wallet.</li>
-                    <li>Pay the exact total amount and input the Booking Reference Number in the transfer notes/message: <strong>%s</strong>.</li>
-                    <li>Reply to this email with a screenshot of your payment receipt so we can verify your payment.</li>
+                    <li>Complete the payment using the QR code.</li>
+                    <li>Take a screenshot of your payment receipt.</li>
+                    <li>Reply to this email and attach the screenshot.</li>
+                    <li>Wait for Yabera Suite to verify your payment.</li>
                   </ol>
-                </div>
-
-                <div style="background:#fff5e5;border:1px solid #f6d18c;border-radius:10px;padding:16px;margin:0 0 18px;color:#7c2d12">
-                  <p style="margin:0;color:#7c2d12;font-size:15px;font-weight:800;line-height:1.6">
-                    ⚠️ Payment First Policy: Your booking is tentative and will only be confirmed once payment is verified. Please settle within 24 hours to secure your reserved dates. Unpaid requests will be automatically cancelled.
-                  </p>
+                  <p style="margin:12px 0 0;color:#4b5563;font-size:15px;line-height:1.6">Once we verify your payment, we will send you a Booking Confirmation email.</p>
                 </div>
 
                 <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
@@ -220,15 +243,26 @@ public class EmailService {
                 b.getCheckOut().format(DATE_FMT),
                 b.getNumberOfGuests(),
                 roomTotalText,
+                nightsText,
                 extraGuestFeeText,
                 totalText,
                 qrMarkup,
-                bookingRef,
                 bookingRef
         ));
     }
 
     private Resource resolveQrCodeResource() {
+            String configuredPath = props.getMail().getQrPath();
+            if (configuredPath != null && !configuredPath.isBlank()) {
+                  Resource configured = configuredPath.startsWith("classpath:")
+                  ? new ClassPathResource(configuredPath.substring("classpath:".length()))
+                  : new FileSystemResource(Path.of(configuredPath).toAbsolutePath().normalize());
+              if (configured.exists() && configured.isReadable()) {
+                return configured;
+              }
+              log.error("Configured payment QR image is missing or unreadable: {}", configuredPath);
+            }
+
         Resource bundledResource = new ClassPathResource("static/images/QR-Payment.jpg");
         if (bundledResource.exists() && bundledResource.isReadable()) {
             return bundledResource;
@@ -242,12 +276,16 @@ public class EmailService {
             return frontendResource;
         }
 
-        log.warn("PSBank QR payment image not found. Checked classpath resource "
+        log.error("Payment QR image not found. Checked configured path, classpath resource "
                 + "static/images/QR-Payment.jpg and filesystem path {}", frontendPath);
         return null;
     }
 
     private PriceSummary computePriceSummary(Booking booking) {
+      if (booking.getRoomTotal() != null && booking.getExtraGuestTotal() != null && booking.getTotalAmount() != null) {
+        int nights = Math.toIntExact(ChronoUnit.DAYS.between(booking.getCheckIn(), booking.getCheckOut()));
+        return new PriceSummary(nights, booking.getRoomTotal(), booking.getExtraGuestTotal(), booking.getTotalAmount());
+      }
         int nights = Math.toIntExact(ChronoUnit.DAYS.between(booking.getCheckIn(), booking.getCheckOut()));
         int extraGuests = Math.max(0, booking.getNumberOfGuests() - 2);
         boolean discountApplied = nights >= 3;
@@ -272,7 +310,7 @@ public class EmailService {
         }
 
         int extraGuestTotal = extraGuests * EXTRA_GUEST_FEE * nights;
-        return new PriceSummary(roomTotal, extraGuestTotal, roomTotal + extraGuestTotal);
+        return new PriceSummary(nights, roomTotal, extraGuestTotal, roomTotal + extraGuestTotal);
     }
 
     private String formatPeso(int amount) {
@@ -280,11 +318,13 @@ public class EmailService {
     }
 
     private static class PriceSummary {
+      private final int nights;
         private final int roomTotal;
         private final int extraGuestTotal;
         private final int total;
 
-        private PriceSummary(int roomTotal, int extraGuestTotal, int total) {
+        private PriceSummary(int nights, int roomTotal, int extraGuestTotal, int total) {
+          this.nights = nights;
             this.roomTotal = roomTotal;
             this.extraGuestTotal = extraGuestTotal;
             this.total = total;
@@ -351,7 +391,7 @@ public class EmailService {
                   <tr>
                     <td style="padding:12px 16px;background:#fdf8f3">
                       <span style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Address</span><br>
-                      <span style="color:#1f2937;font-size:15px;font-weight:600">Avida Towers Riala Tower 5</span><br>
+                      <span style="color:#1f2937;font-size:15px;font-weight:600">Avida Towers Riala Tower 5 | Room 3025</span><br>
                       <span style="color:#4b5563;font-size:14px">Cebu IT Park, Jose Maria del Mar Street, Apas, Cebu City</span>
                     </td>
                   </tr>

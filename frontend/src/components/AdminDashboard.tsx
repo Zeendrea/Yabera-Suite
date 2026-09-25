@@ -189,7 +189,7 @@ export default function AdminDashboard() {
   const today = new Date().toISOString().slice(0, 10)
   const metrics = {
     total:     bookings.length,
-    pending:   bookings.filter((b) => b.status === 'PENDING').length,
+    pending:   bookings.filter((b) => b.status === 'AWAITING_PAYMENT').length,
     confirmed: bookings.filter((b) => b.status === 'CONFIRMED').length,
     checkIns:  bookings.filter((b) => b.status === 'CONFIRMED' && b.checkIn >= today).length,
     checkOuts: bookings.filter((b) => b.status === 'CONFIRMED' && b.checkOut >= today).length,
@@ -198,7 +198,7 @@ export default function AdminDashboard() {
 
   const metricCards = [
     { key: 'ALL',       label: 'All Bookings',   value: metrics.total,     icon: ICONS.total,     accent: 'bg-[#F2EBE1] text-[#B88A6A]' },
-    { key: 'PENDING',   label: 'Pending',         value: metrics.pending,   icon: ICONS.pending,   accent: 'bg-amber-50 text-amber-600'   },
+    { key: 'AWAITING_PAYMENT', label: 'Awaiting Payment', value: metrics.pending, icon: ICONS.pending, accent: 'bg-amber-50 text-amber-600' },
     { key: 'CONFIRMED', label: 'Confirmed',       value: metrics.confirmed, icon: ICONS.confirmed, accent: 'bg-green-50 text-green-600'   },
     { key: 'checkin',   label: 'Upcoming Check-ins',  value: metrics.checkIns,  icon: ICONS.checkIn,  accent: 'bg-sky-50 text-sky-600'   },
     { key: 'checkout',  label: 'Upcoming Check-outs', value: metrics.checkOuts, icon: ICONS.checkOut, accent: 'bg-violet-50 text-violet-600'},
@@ -206,7 +206,7 @@ export default function AdminDashboard() {
   ] as const
 
   function handleMetricClick(key: string) {
-    if (key === 'ALL' || key === 'PENDING' || key === 'CONFIRMED') {
+    if (key === 'ALL' || key === 'AWAITING_PAYMENT' || key === 'CONFIRMED') {
       setActiveFilter(key as StatusFilter)
     }
     // checkin / checkout / blocked don't map to a status filter — just deselect

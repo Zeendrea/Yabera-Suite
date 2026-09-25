@@ -11,6 +11,8 @@ import com.yaberasuite.exception.DatesUnavailableException;
 import com.yaberasuite.repo.BlockedDateRepository;
 import com.yaberasuite.repo.BookingRepository;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,22 +24,33 @@ import java.util.UUID;
 @Service
 public class BookingService {
 
-    private static final List<BookingStatus> HOLDING_STATUSES = List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED);
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
+
+        private static final List<BookingStatus> HOLDING_STATUSES = List.of(
+            BookingStatus.AWAITING_PAYMENT,
+            BookingStatus.PAYMENT_SUBMITTED,
+            BookingStatus.PAYMENT_VERIFIED,
+            BookingStatus.PENDING,
+            BookingStatus.CONFIRMED
+        );
     private final BookingRepository bookingRepository;
     private final BlockedDateRepository blockedDateRepository;
     private final OccupancyService occupancyService;
     private final EmailService emailService;
+    private final PricingService pricingService;
 
     public BookingService(
             BookingRepository bookingRepository,
             BlockedDateRepository blockedDateRepository,
             OccupancyService occupancyService,
-            EmailService emailService
+            EmailService emailService,
+            PricingService pricingService
     ) {
         this.bookingRepository = bookingRepository;
         this.blockedDateRepository = blockedDateRepository;
         this.occupancyService = occupancyService;
         this.emailService = emailService;
+        this.pricingService = pricingService;
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +66,7 @@ public class BookingService {
                 new AvailabilityResponse.UnavailableRange(
                         booking.getCheckIn(),
                         booking.getCheckOut(),
-                        booking.getStatus() == BookingStatus.PENDING ? "PENDING" : "BOOKED"
+                        booking.getStatus() == BookingStatus.CONFIRMED ? "BOOKED" : "PENDING"
                 )
         ));
         blockedDateRepository.findOverlapping(start, end).forEach(block -> ranges.add(
@@ -80,7 +93,8 @@ public class BookingService {
         booking.setCheckIn(request.checkIn());
         booking.setCheckOut(request.checkOut());
         booking.setMessage(request.message() == null || request.message().isBlank() ? null : request.message().trim());
-        booking.setStatus(BookingStatus.PENDING);
+        booking.setStatus(BookingStatus.AWAITING_PAYMENT);
+        pricingService.applyTo(booking);
         booking = bookingRepository.saveAndFlush(booking);
 
         try {
@@ -92,7 +106,7 @@ public class BookingService {
         // Notify guest — runs on a background thread, does not block the response
         emailService.sendBookingRequestReceived(booking);
 
-        return new BookingCreateResponse(toResponse(booking), BookingStatus.PENDING);
+        return new BookingCreateResponse(toResponse(booking), BookingStatus.AWAITING_PAYMENT);
     }
 
     @Transactional(readOnly = true)
@@ -109,25 +123,40 @@ public class BookingService {
             return toResponse(booking);
         }
 
-        if (status == BookingStatus.CANCELLED) {
-            occupancyService.releaseBooking(booking.getId());
-            booking.setStatus(BookingStatus.CANCELLED);
-        } else if (status == BookingStatus.CONFIRMED) {
-            if (booking.getStatus() == BookingStatus.CANCELLED) {
-                if (occupancyService.isRangeOccupied(booking.getCheckIn(), booking.getCheckOut())) {
-                    throw new DatesUnavailableException("Those dates are no longer available.");
-                }
-                occupancyService.occupyBooking(booking.getId(), booking.getCheckIn(), booking.getCheckOut());
+        if (status == BookingStatus.REJECTED) {
+            if (booking.getStatus() == BookingStatus.CONFIRMED || booking.getStatus() == BookingStatus.EXPIRED) {
+                throw new ApiException("This booking can no longer be rejected.");
             }
-            booking.setStatus(BookingStatus.CONFIRMED);
-        } else if (status == BookingStatus.REJECTED) {
             occupancyService.releaseBooking(booking.getId());
             booking.setStatus(BookingStatus.REJECTED);
-        } else if (status == BookingStatus.PENDING) {
-            throw new ApiException("Bookings cannot be moved back to pending.");
+        } else if (status == BookingStatus.CANCELLED) {
+            if (booking.getStatus() != BookingStatus.CONFIRMED) {
+                throw new ApiException("Only confirmed bookings can be cancelled.");
+            }
+            occupancyService.releaseBooking(booking.getId());
+            booking.setStatus(BookingStatus.CANCELLED);
+        } else if (status == BookingStatus.PAYMENT_SUBMITTED) {
+            if (booking.getStatus() != BookingStatus.AWAITING_PAYMENT && booking.getStatus() != BookingStatus.PENDING) {
+                throw new ApiException("Only bookings awaiting payment can be marked as payment submitted.");
+            }
+            booking.setStatus(BookingStatus.PAYMENT_SUBMITTED);
+        } else if (status == BookingStatus.PAYMENT_VERIFIED) {
+            if (booking.getStatus() != BookingStatus.PAYMENT_SUBMITTED) {
+                throw new ApiException("Payment must be submitted before it can be verified.");
+            }
+            booking.setStatus(BookingStatus.PAYMENT_VERIFIED);
+        } else if (status == BookingStatus.CONFIRMED) {
+            if (booking.getStatus() != BookingStatus.PAYMENT_VERIFIED) {
+                throw new ApiException("Payment must be verified before the booking can be confirmed.");
+            }
+            booking.setStatus(BookingStatus.CONFIRMED);
+        } else if (status == BookingStatus.AWAITING_PAYMENT || status == BookingStatus.PENDING
+                || status == BookingStatus.PAYMENT_VERIFIED || status == BookingStatus.EXPIRED) {
+            throw new ApiException("Invalid booking status transition.");
         }
 
         Booking saved = bookingRepository.save(booking);
+        log.info("Booking {} status changed to {}", saved.getBookingReference(), saved.getStatus());
 
         // Notify guest of status change — runs on a background thread
         if (status == BookingStatus.CONFIRMED) {
@@ -163,6 +192,9 @@ public class BookingService {
                 booking.getCheckIn(),
                 booking.getCheckOut(),
                 booking.getNights(),
+                booking.getRoomTotal(),
+                booking.getExtraGuestTotal(),
+                booking.getTotalAmount(),
                 booking.getMessage(),
                 booking.getStatus(),
                 booking.getCreatedAt(),

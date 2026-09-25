@@ -46,7 +46,7 @@ yabera:
   mail:
     from: ${MAIL_FROM:noreply@yaberasuite.com}
     admin-address: ${MAIL_ADMIN_ADDRESS:}
-    qr-code-url: ${MAIL_QR_CODE_URL:}
+    qr-path: ${YABERA_PAYMENT_QR_PATH:}
 
 logging:
   level:

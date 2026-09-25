@@ -42,6 +42,10 @@ function DetailRow({ label, value, children }: { label: string; value?: string; 
   )
 }
 
+function formatPeso(amount: number | null) {
+  return amount == null ? '—' : `₱${amount.toLocaleString('en-US')}`
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function BookingRequestSuccess({ booking }: { booking: Booking }) {
   const [copied, setCopied] = useState(false)
@@ -79,8 +83,8 @@ export default function BookingRequestSuccess({ booking }: { booking: Booking })
           Booking Request Submitted!
         </h2>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-ink-700">
-          Thank you for your request. Your booking is currently pending confirmation.
-          We will review your request and contact you using the contact information you provided.
+          Thank you for your request. Your booking is currently awaiting payment and is not confirmed yet.
+          Please check your email for the payment instructions and QR code.
         </p>
       </div>
 
@@ -126,6 +130,46 @@ export default function BookingRequestSuccess({ booking }: { booking: Booking })
         </dl>
       </div>
 
+      {/* ── Payment breakdown ── */}
+      <div className="mt-8 overflow-hidden rounded-3xl border border-[#F3D2BC] bg-white shadow-card">
+        <div className="border-b border-[#F3D2BC] bg-[#FFF7F1] px-6 py-4">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[#9A3412]">
+            Payment Breakdown
+          </p>
+        </div>
+        <div className="px-6 py-4">
+          <div className="flex justify-between border-b border-sand-100 py-3 text-sm">
+            <span className="text-ink-600">Room rate</span>
+            <span className="font-semibold text-ink-900">{formatPeso(booking.roomTotal)}</span>
+          </div>
+          <div className="flex justify-between border-b border-sand-100 py-3 text-sm">
+            <span className="text-ink-600">Number of nights</span>
+            <span className="font-semibold text-ink-900">{booking.nights} {booking.nights === 1 ? 'night' : 'nights'}</span>
+          </div>
+          <div className="flex justify-between border-b border-sand-100 py-3 text-sm">
+            <span className="text-ink-600">Extra guest fee</span>
+            <span className="font-semibold text-ink-900">{formatPeso(booking.extraGuestTotal)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4 py-4">
+            <span className="text-sm font-bold uppercase tracking-wide text-ink-900">Total amount to pay</span>
+            <span className="text-2xl font-extrabold text-[#9A3412]">{formatPeso(booking.totalAmount)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Payment QR ── */}
+      <div className="mt-8 rounded-3xl border border-sand-200 bg-[#FFF7F1] px-6 py-6 text-center">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-[#9A3412]">Payment</p>
+        <p className="mt-2 text-sm text-ink-700">Scan the QR code below to complete your payment.</p>
+        <img
+          src="/images/QR-Payment.jpg"
+          alt="Payment QR code"
+          className="mx-auto mt-5 h-auto w-[220px] max-w-full rounded-xl border border-sand-200 bg-white p-2"
+        />
+        <p className="mt-4 text-sm font-semibold text-[#9A3412]">Payment must be completed within 24 hours.</p>
+        <p className="mt-1 text-xs text-ink-600">Your booking is not confirmed until payment is verified.</p>
+      </div>
+
       {/* ── What happens next ── */}
       <div className="mt-8 rounded-3xl border border-sand-200 bg-[#FDFBF7] px-6 py-6">
         <p className="mb-5 text-[11px] font-bold uppercase tracking-widest text-[#B88A6A]">
@@ -134,18 +178,18 @@ export default function BookingRequestSuccess({ booking }: { booking: Booking })
         <div className="space-y-5">
           <Step
             n={1}
-            title="Host Review"
-            body="The host will verify your selected dates and availability within 24 hours."
+            title="Complete payment"
+            body="Use the QR code in your email and reply with a screenshot of your receipt within 24 hours."
           />
           <Step
             n={2}
-            title="Confirmation Notification"
-            body="You will receive a confirmation and further details via the email address you provided."
+            title="Payment verification"
+            body="Yabera Suite will manually verify the payment before the booking can be confirmed."
           />
           <Step
             n={3}
-            title="Check-in Instructions"
-            body="Once approved, access codes and full check-in details will be sent to you before your stay."
+            title="Booking confirmation"
+            body="After verification, the host will confirm your booking and send the existing check-in details."
           />
         </div>
       </div>

@@ -104,8 +104,8 @@ public class YaberaProperties {
         /** Admin address that receives internal copies (optional). */
         private String adminAddress;
 
-        /** Publicly accessible URL of the PSBank QR code image embedded in payment emails. */
-        private String qrCodeUrl;
+        /** Local or classpath path of the QR image embedded in payment emails. */
+        private String qrPath;
 
         public String getFrom() {
             return from;
@@ -123,12 +123,12 @@ public class YaberaProperties {
             this.adminAddress = adminAddress;
         }
 
-        public String getQrCodeUrl() {
-            return qrCodeUrl;
+        public String getQrPath() {
+            return qrPath;
         }
 
-        public void setQrCodeUrl(String qrCodeUrl) {
-            this.qrCodeUrl = qrCodeUrl;
+        public void setQrPath(String qrPath) {
+            this.qrPath = qrPath;
         }
     }
 }

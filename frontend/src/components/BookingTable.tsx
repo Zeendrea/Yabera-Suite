@@ -10,27 +10,10 @@ import StatusBadge from './StatusBadge'
 const PAGE_SIZE = 8
 
 // Tab definitions — what each tab shows
-export type TabKey = 'active' | 'completed' | 'cancelled' | 'all'
-
-const TODAY = () => new Date().toISOString().slice(0, 10)
+export type TabKey = BookingStatus | 'ALL'
 
 function tabFilter(tab: TabKey, booking: Booking): boolean {
-  const today = TODAY()
-  switch (tab) {
-    case 'active':
-      // PENDING always active; CONFIRMED only if checkout hasn't passed
-      return (
-        booking.status === 'PENDING' ||
-        (booking.status === 'CONFIRMED' && booking.checkOut >= today)
-      )
-    case 'completed':
-      // Confirmed stays whose checkout date is in the past
-      return booking.status === 'CONFIRMED' && booking.checkOut < today
-    case 'cancelled':
-      return booking.status === 'REJECTED' || booking.status === 'CANCELLED'
-    case 'all':
-      return true
-  }
+  return tab === 'ALL' || booking.status === tab
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,8 +120,16 @@ function ActionMenu({
   }, [])
 
   const actions: { label: string; status: BookingStatus; icon: string; cls: string }[] = []
-  if (booking.status === 'PENDING') {
-    actions.push({ label: 'Approve', status: 'CONFIRMED', icon: I.approve, cls: 'text-green-700 hover:bg-green-50' })
+  if (booking.status === 'AWAITING_PAYMENT' || booking.status === 'PENDING') {
+    actions.push({ label: 'Payment submitted', status: 'PAYMENT_SUBMITTED', icon: I.approve, cls: 'text-sky-700 hover:bg-sky-50' })
+    actions.push({ label: 'Reject',  status: 'REJECTED',  icon: I.reject,  cls: 'text-rose-600 hover:bg-rose-50'  })
+  }
+  if (booking.status === 'PAYMENT_SUBMITTED') {
+    actions.push({ label: 'Verify payment', status: 'PAYMENT_VERIFIED', icon: I.approve, cls: 'text-blue-700 hover:bg-blue-50' })
+    actions.push({ label: 'Reject',  status: 'REJECTED',  icon: I.reject,  cls: 'text-rose-600 hover:bg-rose-50'  })
+  }
+  if (booking.status === 'PAYMENT_VERIFIED') {
+    actions.push({ label: 'Confirm booking', status: 'CONFIRMED', icon: I.approve, cls: 'text-green-700 hover:bg-green-50' })
     actions.push({ label: 'Reject',  status: 'REJECTED',  icon: I.reject,  cls: 'text-rose-600 hover:bg-rose-50'  })
   }
   if (booking.status === 'CONFIRMED') {
@@ -185,10 +176,13 @@ function ActionMenu({
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TAB_META: { key: TabKey; label: string }[] = [
-  { key: 'active',    label: 'Active / Upcoming' },
-  { key: 'completed', label: 'Completed'         },
-  { key: 'cancelled', label: 'Cancelled'         },
-  { key: 'all',       label: 'All Bookings'      },
+  { key: 'ALL', label: 'All' },
+  { key: 'AWAITING_PAYMENT', label: 'Awaiting Payment' },
+  { key: 'PAYMENT_SUBMITTED', label: 'Payment Submitted' },
+  { key: 'PAYMENT_VERIFIED', label: 'Payment Verified' },
+  { key: 'CONFIRMED', label: 'Confirmed' },
+  { key: 'EXPIRED', label: 'Expired' },
+  { key: 'REJECTED', label: 'Rejected' },
 ]
 
 function TabBar({
@@ -351,10 +345,14 @@ export default function BookingTable({ bookings, onStatus }: Props) {
     try {
       await onStatus(booking.id, status)
       const msgs: Record<BookingStatus, string> = {
-        CONFIRMED: `Approved — confirmation email sent to ${booking.email}.`,
-        REJECTED:  `Booking ${booking.bookingReference} rejected.`,
+        AWAITING_PAYMENT: '',
+        PAYMENT_SUBMITTED: `Payment marked as submitted for ${booking.bookingReference}.`,
+        PAYMENT_VERIFIED: `Payment verified for ${booking.bookingReference}.`,
+        CONFIRMED: `Booking confirmed — email sent to ${booking.email}.`,
+        EXPIRED: `Booking ${booking.bookingReference} expired.`,
+        REJECTED: `Booking ${booking.bookingReference} rejected.`,
+        PENDING: '',
         CANCELLED: `Booking ${booking.bookingReference} cancelled.`,
-        PENDING:   '',
       }
       addToast(msgs[status], 'success')
     } catch (err) {
@@ -366,12 +364,7 @@ export default function BookingTable({ bookings, onStatus }: Props) {
 
   // Tab counts (computed from full list, ignoring search)
   const counts = useMemo<Record<TabKey, number>>(
-    () => ({
-      active:    bookings.filter((b) => tabFilter('active', b)).length,
-      completed: bookings.filter((b) => tabFilter('completed', b)).length,
-      cancelled: bookings.filter((b) => tabFilter('cancelled', b)).length,
-      all:       bookings.length,
-    }),
+    () => Object.fromEntries(TAB_META.map(({ key }) => [key, key === 'ALL' ? bookings.length : bookings.filter((b) => b.status === key).length])) as Record<TabKey, number>,
     [bookings],
   )
 
