@@ -1,6 +1,6 @@
 import type { AvailabilityResponse, BlockedDate, Booking, BookingCreateResponse, BookingStatus } from './types'
 
-const API = import.meta.env.VITE_API_URL ?? ''
+const API = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '')).replace(/\/$/, '')
 
 function authHeader() {
   const token = localStorage.getItem('yabera_admin_token')
