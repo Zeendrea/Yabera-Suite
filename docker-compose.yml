@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: yabera-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: yabera_suite
+      MYSQL_USER: yabera
+      MYSQL_PASSWORD: claireandrea
+    ports:
+      - "3306:3306"
+    volumes:
+      - yabera-mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uyabera", "-pyabera"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  yabera-mysql-data:
