@@ -17,7 +17,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findAllByOrderByCreatedAtDesc();
 
-        List<Booking> findByStatusAndCreatedAtBefore(BookingStatus status, Instant cutoff);
+    List<Booking> findByStatusAndCreatedAtBefore(BookingStatus status, Instant cutoff);
+
+    @Query(value = "SELECT 1 FROM bookings b WHERE b.status IN (:statuses) AND b.check_in < :checkOut AND b.check_out > :checkIn LIMIT 1", nativeQuery = true)
+    Integer existsOverlap(
+            @Param("checkIn") LocalDate checkIn,
+            @Param("checkOut") LocalDate checkOut,
+            @Param("statuses") List<String> statuses
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.status IN :statuses AND b.checkIn < :checkOut AND b.checkOut > :checkIn")

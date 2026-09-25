@@ -3,9 +3,16 @@ server:
 
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:yabera_suite}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Manila}
+    url: ${DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:yabera_suite}?createDatabaseIfNotExist=true&useSSL=true&requireSSL=true&sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=Asia/Manila}
     username: ${DB_USERNAME:${DB_USER:root}}
     password: ${DB_PASSWORD:${DB_PASS:claireandrea}}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 20000
   jpa:
     hibernate:
       ddl-auto: update

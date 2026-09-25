@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StopWatch;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -77,13 +78,24 @@ public class BookingService {
 
     @Transactional
     public BookingCreateResponse createRequest(BookingRequest request) {
-        validateStay(request.checkIn(), request.checkOut(), request.numberOfGuests());
+        StopWatch sw = new StopWatch("booking-create");
 
-        bookingRepository.findOverlappingForUpdate(request.checkIn(), request.checkOut(), HOLDING_STATUSES);
-        if (occupancyService.isRangeOccupied(request.checkIn(), request.checkOut())) {
+        sw.start("validateStay");
+        validateStay(request.checkIn(), request.checkOut(), request.numberOfGuests());
+        sw.stop();
+
+        List<String> statusValues = HOLDING_STATUSES.stream().map(Enum::name).toList();
+        List<LocalDate> nights = occupancyService.nights(request.checkIn(), request.checkOut());
+
+        sw.start("conflictCheck");
+        Integer bookingConflict = bookingRepository.existsOverlap(request.checkIn(), request.checkOut(), statusValues);
+        Integer occupiedConflict = occupiedNightRepository.existsAnyNightDateIn(nights);
+        if (bookingConflict != null || occupiedConflict != null) {
             throw new DatesUnavailableException("Some of your selected dates are unavailable. Please choose another date.");
         }
+        sw.stop();
 
+        sw.start("saveBooking");
         Booking booking = new Booking();
         booking.setBookingReference("YAB-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         booking.setGuestName(request.guestName().trim());
@@ -96,12 +108,17 @@ public class BookingService {
         booking.setStatus(BookingStatus.AWAITING_PAYMENT);
         pricingService.applyTo(booking);
         booking = bookingRepository.saveAndFlush(booking);
+        sw.stop();
 
+        sw.start("occupyBooking");
         try {
             occupancyService.occupyBooking(booking.getId(), booking.getCheckIn(), booking.getCheckOut());
         } catch (DataIntegrityViolationException ex) {
             throw new DatesUnavailableException("Some of your selected dates are unavailable. Please choose another date.");
         }
+        sw.stop();
+
+        log.info(sw.prettyPrint());
 
         // Notify guest — runs on a background thread, does not block the response
         emailService.sendBookingRequestReceived(booking);
