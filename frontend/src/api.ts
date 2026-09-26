@@ -1,6 +1,6 @@
 import type { AvailabilityResponse, BlockedDate, Booking, BookingCreateResponse, BookingStatus } from './types'
 
-const API = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '')).replace(/\/$/, '')
+const API = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8080' : 'https://yabera-suite.onrender.com')).replace(/\/$/, '')
 const AVAILABILITY_CACHE_MS = 30_000
 const AVAILABILITY_TIMEOUT_MS = 30_000
 const availabilityCache = new Map<string, { expiresAt: number | null; request: Promise<AvailabilityResponse> }>()

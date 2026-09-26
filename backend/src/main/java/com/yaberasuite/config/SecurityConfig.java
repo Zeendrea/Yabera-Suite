@@ -17,6 +17,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -45,6 +46,7 @@ public class SecurityConfig {
                 }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error", "/api/auth/login", "/api/public/**", "/api/bookings").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/availability").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
@@ -61,13 +63,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        List<String> origins = Arrays.stream(properties.getCors().getAllowedOrigins().split(","))
+        List<String> configuredOrigins = Arrays.stream(properties.getCors().getAllowedOrigins().split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
                 .toList();
+        List<String> origins = new ArrayList<>(List.of("https://yabera-suite.vercel.app"));
+        for (String localOrigin : List.of("http://localhost:5173", "http://127.0.0.1:5173")) {
+            if (configuredOrigins.contains(localOrigin)) {
+                origins.add(localOrigin);
+            }
+        }
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of("Content-Type", "Authorization", "Accept"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

@@ -47,7 +47,7 @@ yabera:
     secret: ${JWT_SECRET:change-this-to-a-long-random-secret-key-for-yabera-suite}
     expiration-ms: 86400000
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+    allowed-origins: ${CORS_ORIGINS:https://yabera-suite.vercel.app,http://localhost:5173,http://127.0.0.1:5173}
   property:
     name: ${PROPERTY_NAME:Yabera Suite}
   mail:
