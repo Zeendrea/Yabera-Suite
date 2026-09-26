@@ -63,7 +63,7 @@ public class BookingService {
         }
 
         List<AvailabilityResponse.UnavailableRange> ranges = new ArrayList<>();
-        bookingRepository.findOverlapping(start, end, HOLDING_STATUSES).forEach(booking -> ranges.add(
+        bookingRepository.findAvailabilityOverlapping(start, end, HOLDING_STATUSES).forEach(booking -> ranges.add(
                 new AvailabilityResponse.UnavailableRange(
                         booking.getCheckIn(),
                         booking.getCheckOut(),
@@ -84,13 +84,10 @@ public class BookingService {
         validateStay(request.checkIn(), request.checkOut(), request.numberOfGuests());
         sw.stop();
 
-        List<String> statusValues = HOLDING_STATUSES.stream().map(Enum::name).toList();
-        List<LocalDate> nights = occupancyService.nights(request.checkIn(), request.checkOut());
-
         sw.start("conflictCheck");
-        Integer bookingConflict = bookingRepository.existsOverlap(request.checkIn(), request.checkOut(), statusValues);
-        Integer occupiedConflict = occupiedNightRepository.existsAnyNightDateIn(nights);
-        if (bookingConflict != null || occupiedConflict != null) {
+        Integer bookingConflict = bookingRepository.existsOverlap(
+                request.checkIn(), request.checkOut(), HOLDING_STATUSES.stream().map(Enum::name).toList());
+        if (bookingConflict != null) {
             throw new DatesUnavailableException("Some of your selected dates are unavailable. Please choose another date.");
         }
         sw.stop();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createBooking, fetchAvailability } from '../api'
 import AvailabilityCalendar from '../components/AvailabilityCalendar'
 import BookingForm from '../components/BookingForm'
@@ -10,11 +10,13 @@ import { addDays, nightsBetween, occupancyMap, rangeHasConflict, toIso } from '.
 import type { BookingCreateResponse, UnavailableRange } from '../types'
 
 type Step = 1 | 2
+type AvailabilityState = 'loading' | 'loaded' | 'error'
 
 export default function BookingPage() {
   // ── Availability ────────────────────────────────────────────────────────
   const [unavailable, setUnavailable] = useState<UnavailableRange[]>([])
-  const [loadError,   setLoadError]   = useState<string | null>(null)
+  const [availabilityState, setAvailabilityState] = useState<AvailabilityState>('loading')
+  const [availabilityAttempt, setAvailabilityAttempt] = useState(0)
 
   // ── Date / guest selection (step 1) ────────────────────────────────────
   const [checkIn,        setCheckIn]        = useState<string | null>(null)
@@ -33,6 +35,7 @@ export default function BookingPage() {
   const [formError,  setFormError]  = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [result,     setResult]     = useState<BookingCreateResponse | null>(null)
+  const submitInFlight = useRef(false)
 
   const occupancy = useMemo(() => occupancyMap(unavailable), [unavailable])
   const nights    = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0
@@ -41,10 +44,20 @@ export default function BookingPage() {
   useEffect(() => {
     const from = toIso(new Date())
     const to   = addDays(from, 240)
-    fetchAvailability(from, to)
-      .then((d) => setUnavailable(d.unavailable))
-      .catch(() => setLoadError('Unable to load availability. Please refresh.'))
-  }, [])
+    let active = true
+    setAvailabilityState('loading')
+    fetchAvailability(from, to, availabilityAttempt > 0)
+      .then((d) => {
+        if (active) {
+          setUnavailable(d.unavailable)
+          setAvailabilityState('loaded')
+        }
+      })
+      .catch(() => {
+        if (active) setAvailabilityState('error')
+      })
+    return () => { active = false }
+  }, [availabilityAttempt])
 
   // ── Field handler (step 2) ──────────────────────────────────────────────
   function onField(field: string, value: string) {
@@ -57,6 +70,7 @@ export default function BookingPage() {
 
   // ── Step 1 → 2 ──────────────────────────────────────────────────────────
   function goToStep2() {
+    if (availabilityState !== 'loaded') return
     if (!checkIn || !checkOut || nights < 1) return
     if (conflict) {
       setFormError('Some of your selected dates are unavailable. Please choose another date.')
@@ -86,12 +100,14 @@ export default function BookingPage() {
   }
 
   async function submit() {
+    if (submitInFlight.current) return
     if (!validate() || !checkIn || !checkOut) return
     if (conflict) {
       setFormError('Some of your selected dates are unavailable. Please choose another date.')
       return
     }
     setFormError(null)
+    submitInFlight.current = true
     setSubmitting(true)
     try {
       const created = await createBooking({
@@ -107,6 +123,7 @@ export default function BookingPage() {
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Unable to send your request. Please try again.')
     } finally {
+      submitInFlight.current = false
       setSubmitting(false)
     }
   }
@@ -165,8 +182,19 @@ export default function BookingPage() {
         </div>
 
         {/* Load error */}
-        {loadError && (
-          <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800">{loadError}</p>
+        {availabilityState === 'error' && (
+          <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <p>Unable to load availability. Please try again.</p>
+            <button
+              onClick={() => {
+                setAvailabilityAttempt((attempt) => attempt + 1)
+                setAvailabilityState('loading')
+              }}
+              className="shrink-0 font-semibold underline underline-offset-2"
+            >
+              Retry
+            </button>
+          </div>
         )}
 
         {/* Two-column layout — summary always visible on right */}
@@ -179,6 +207,8 @@ export default function BookingPage() {
               <div className="space-y-6">
                 <AvailabilityCalendar
                   unavailable={unavailable}
+                  isLoading={availabilityState === 'loading'}
+                  isReady={availabilityState === 'loaded'}
                   checkIn={checkIn}
                   checkOut={checkOut}
                   onChange={(ci, co) => {
@@ -218,7 +248,7 @@ export default function BookingPage() {
                 {/* Mobile-only continue button */}
                 <button
                   onClick={goToStep2}
-                  disabled={!checkIn || !checkOut || nights < 1 || !!conflict}
+                  disabled={availabilityState !== 'loaded' || !checkIn || !checkOut || nights < 1 || !!conflict}
                   className="w-full rounded-full bg-ink-900 py-3.5 text-sm font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 lg:hidden"
                 >
                   Continue to Guest Details
@@ -267,7 +297,7 @@ export default function BookingPage() {
               submitting={submitting}
               onContinue={goToStep2}
               onSubmit={submit}
-              continueDisabled={!checkIn || !checkOut || nights < 1 || !!conflict}
+              continueDisabled={availabilityState !== 'loaded' || !checkIn || !checkOut || nights < 1 || !!conflict}
             />
           </div>
         </div>

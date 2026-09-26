@@ -40,4 +40,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("to") LocalDate to,
             @Param("statuses") List<BookingStatus> statuses
     );
+
+    @Query("SELECT b.checkIn AS checkIn, b.checkOut AS checkOut, b.status AS status " +
+            "FROM Booking b WHERE b.status IN :statuses AND b.checkIn < :to AND b.checkOut > :from")
+    List<BookingAvailabilityProjection> findAvailabilityOverlapping(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("statuses") List<BookingStatus> statuses
+    );
 }

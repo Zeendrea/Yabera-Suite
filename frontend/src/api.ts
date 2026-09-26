@@ -1,8 +1,11 @@
 import type { AvailabilityResponse, BlockedDate, Booking, BookingCreateResponse, BookingStatus } from './types'
 
 const API = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '')).replace(/\/$/, '')
+const AVAILABILITY_CACHE_MS = 30_000
+const AVAILABILITY_TIMEOUT_MS = 30_000
+const availabilityCache = new Map<string, { expiresAt: number | null; request: Promise<AvailabilityResponse> }>()
 
-function authHeader() {
+function authHeader(): Record<string, string> {
   const token = localStorage.getItem('yabera_admin_token')
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
@@ -19,9 +22,32 @@ async function parse<T>(response: Response): Promise<T> {
   return data as T
 }
 
-export async function fetchAvailability(from: string, to: string) {
+export async function fetchAvailability(from: string, to: string, forceRefresh = false) {
   const params = new URLSearchParams({ from, to })
-  return parse<AvailabilityResponse>(await fetch(`${API}/api/availability?${params}`))
+  const key = `${from}:${to}`
+  const cached = availabilityCache.get(key)
+  if (!forceRefresh && cached && (cached.expiresAt === null || cached.expiresAt > Date.now())) {
+    return cached.request
+  }
+
+  const request = fetch(`${API}/api/availability?${params}`, {
+    signal: AbortSignal.timeout(AVAILABILITY_TIMEOUT_MS),
+  })
+    .then(parse<AvailabilityResponse>)
+    .then((data) => {
+      if (!Array.isArray(data.unavailable) || typeof data.from !== 'string' || typeof data.to !== 'string') {
+        throw new Error('The availability response was invalid.')
+      }
+      const entry = availabilityCache.get(key)
+      if (entry?.request === request) entry.expiresAt = Date.now() + AVAILABILITY_CACHE_MS
+      return data
+    })
+    .catch((error: unknown) => {
+      if (availabilityCache.get(key)?.request === request) availabilityCache.delete(key)
+      throw error
+    })
+  availabilityCache.set(key, { expiresAt: null, request })
+  return request
 }
 
 export async function createBooking(payload: {
@@ -33,13 +59,15 @@ export async function createBooking(payload: {
   checkOut: string
   message?: string
 }) {
-  return parse<BookingCreateResponse>(
+  const created = await parse<BookingCreateResponse>(
     await fetch(`${API}/api/bookings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
   )
+  availabilityCache.clear()
+  return created
 }
 
 export async function adminLogin(username: string, password: string) {

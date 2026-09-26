@@ -11,10 +11,12 @@ interface Props {
   checkOut: string | null
   onChange: (checkIn: string | null, checkOut: string | null) => void
   conflictMessage?: string | null
+  isLoading?: boolean
+  isReady?: boolean
 }
 
 export default function AvailabilityCalendar({
-  unavailable, checkIn, checkOut, onChange, conflictMessage,
+  unavailable, checkIn, checkOut, onChange, conflictMessage, isLoading = false, isReady = true,
 }: Props) {
   const today = toIso(new Date())
   const now   = new Date()
@@ -40,6 +42,7 @@ export default function AvailabilityCalendar({
   }
 
   function canSelect(iso: string) {
+    if (!isReady) return false
     if (iso < today) return false
     if (occupancy.get(iso) === 'booked' || occupancy.get(iso) === 'pending') {
       // only allow selecting as check-in if it's not occupied
@@ -91,6 +94,12 @@ export default function AvailabilityCalendar({
           <ChevronRight size={20} />
         </button>
       </div>
+
+      {isLoading && (
+        <p className="mb-2 text-center text-xs text-ink-600" role="status" aria-live="polite">
+          Checking availability…
+        </p>
+      )}
 
       {/* Weekday headers */}
       <div className="grid grid-cols-7 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
