@@ -36,6 +36,7 @@ export default function BookingForm({
         <Field label="Full Name" error={errors.guestName}>
           <input
             type="text"
+            autoComplete="name"
             value={guestName}
             onChange={(e) => onChange('guestName', e.target.value)}
             placeholder="e.g. Maria Santos"
@@ -47,6 +48,7 @@ export default function BookingForm({
         <Field label="Contact Number" error={errors.contactNumber}>
           <input
             type="tel"
+            autoComplete="tel"
             value={contactNumber}
             onChange={(e) => onChange('contactNumber', e.target.value)}
             placeholder="e.g. 09171234567"
@@ -58,6 +60,7 @@ export default function BookingForm({
         <Field label="Email Address" error={errors.email}>
           <input
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => onChange('email', e.target.value)}
             placeholder="e.g. maria@email.com"
