@@ -59,6 +59,7 @@ export default function AdminLoginPage() {
               <input
                 id={id}
                 type={type}
+                autoComplete={id === 'username' ? 'username' : 'current-password'}
                 required
                 value={value}
                 onChange={(e) => set(e.target.value)}

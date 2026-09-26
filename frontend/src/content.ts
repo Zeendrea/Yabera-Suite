@@ -33,7 +33,7 @@ export const GALLERY = [
     label: 'Bathroom',
   },
   {
-    src: 'https://images.unsplash.com/photo-1576013551627-0cc20b96c2f7?auto=format&fit=crop&w=1600&q=80',
+    src: '/images/pool.jpg',
     alt: 'Building swimming pool',
     label: 'Pool',
   },
