@@ -17,8 +17,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 @Configuration
@@ -63,17 +62,15 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        List<String> configuredOrigins = Arrays.stream(properties.getCors().getAllowedOrigins().split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isBlank())
-                .toList();
-        List<String> origins = new ArrayList<>(List.of("https://yabera-suite.vercel.app"));
-        for (String localOrigin : List.of("http://localhost:5173", "http://127.0.0.1:5173")) {
-            if (configuredOrigins.contains(localOrigin)) {
-                origins.add(localOrigin);
+        LinkedHashSet<String> origins = new LinkedHashSet<>();
+        for (String configuredOrigin : properties.getCors().getAllowedOrigins().split(",")) {
+            String origin = configuredOrigin.trim();
+            if (!origin.isBlank() && !origin.equals("*")) {
+                origins.add(origin);
             }
         }
-        configuration.setAllowedOrigins(origins);
+        origins.add("https://yabera-suite.vercel.app");
+        configuration.setAllowedOrigins(List.copyOf(origins));
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Content-Type", "Authorization", "Accept"));
         configuration.setAllowCredentials(true);
