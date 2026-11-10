@@ -53,7 +53,9 @@ export default function BookingPage() {
           setAvailabilityState('loaded')
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        // Surface the full error so it appears in DevTools Console
+        console.error('[BookingPage] availability load failed:', err)
         if (active) setAvailabilityState('error')
       })
     return () => { active = false }
