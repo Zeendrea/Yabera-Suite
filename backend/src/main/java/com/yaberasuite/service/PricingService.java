@@ -13,9 +13,7 @@ public class PricingService {
     private static final int PROMO_RATE = 1799;
     private static final int EXTRA_GUEST_RATE = 300;
 
-    public void applyTo(Booking booking) {
-        int nights = Math.toIntExact(java.time.temporal.ChronoUnit.DAYS.between(
-                booking.getCheckIn(), booking.getCheckOut()));
+    public void applyTo(Booking booking, int nights) {
         int roomTotal;
         if (nights >= 3) {
             roomTotal = nights * PROMO_RATE;

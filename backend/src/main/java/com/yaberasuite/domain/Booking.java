@@ -10,8 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.Generated;
-import org.hibernate.generator.EventType;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -45,8 +43,7 @@ public class Booking {
     @Column(name = "check_out", nullable = false)
     private LocalDate checkOut;
 
-    @Generated(event = EventType.INSERT)
-    @Column(nullable = false, insertable = false, updatable = false)
+    @Column(name = "nights", nullable = false)
     private Integer nights;
 
     @Column(length = 1000)

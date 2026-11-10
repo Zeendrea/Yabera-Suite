@@ -51,7 +51,7 @@ yabera:
   property:
     name: ${PROPERTY_NAME:Yabera Suite}
   mail:
-    from: ${MAIL_FROM:noreply@yaberasuite.com}
+    from: ${MAIL_FROM:suitesyabera@gmail.com}
     admin-address: ${MAIL_ADMIN_ADDRESS:}
     qr-path: ${YABERA_PAYMENT_QR_PATH:}
 

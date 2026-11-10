@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StopWatch;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -101,9 +102,11 @@ public class BookingService {
         booking.setNumberOfGuests(request.numberOfGuests());
         booking.setCheckIn(request.checkIn());
         booking.setCheckOut(request.checkOut());
+        int nights = Math.toIntExact(ChronoUnit.DAYS.between(booking.getCheckIn(), booking.getCheckOut()));
+        booking.setNights(nights);
         booking.setMessage(request.message() == null || request.message().isBlank() ? null : request.message().trim());
         booking.setStatus(BookingStatus.AWAITING_PAYMENT);
-        pricingService.applyTo(booking);
+        pricingService.applyTo(booking, nights);
         booking = bookingRepository.saveAndFlush(booking);
         sw.stop();
 

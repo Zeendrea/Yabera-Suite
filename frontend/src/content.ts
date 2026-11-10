@@ -13,7 +13,7 @@ export const PROPERTY = {
 
 export const GALLERY = [
   {
-    src: '/images/Bedroom.jpeg',
+    src: '/images/Bedroom.jpg',
     alt: 'Queen bedroom with warm lighting',
     label: 'Bedroom',
   },
@@ -38,12 +38,12 @@ export const GALLERY = [
     label: 'Pool',
   },
   {
-    src: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1600&q=80',
+    src: '/images/Building.jpg',
     alt: 'Residential tower exterior',
     label: 'Building',
   },
   {
-    src: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1600&q=80',
+    src: '/images/Surrondingarea.jpg',
     alt: 'City surroundings near IT Park',
     label: 'Surrounding area',
   },
