@@ -52,6 +52,18 @@ Open [http://localhost:5173](http://localhost:5173).
 - Booking: `/book`
 - Host login: `/admin/login`
 
+### Email notifications in production
+
+The backend sends booking-request emails asynchronously through Gmail SMTP. Configure these environment variables on the backend host (for example, Render):
+
+- `MAIL_HOST=smtp.gmail.com`
+- `MAIL_PORT=587`
+- `MAIL_USERNAME` set to the sending Gmail address
+- `MAIL_PASSWORD` set to an app password generated for that same Gmail account
+- `MAIL_FROM` set to the sending Gmail address
+
+After changing the sending Gmail account, generate a new app password for that account and update `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_FROM` on the backend host, then redeploy. Do not put an app password in source control.
+
 ## Availability rules
 
 - Nights are stored as `[check-in, check-out)` (checkout day is free for the next guest).

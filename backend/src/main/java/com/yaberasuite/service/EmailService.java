@@ -59,14 +59,20 @@ public class EmailService {
 
     // ── Public trigger methods (called from BookingService) ─────────────────────
 
-    @Async
+    @Async("emailTaskExecutor")
     public void sendBookingRequestReceived(Booking booking) {
+      try {
+        log.info("Preparing booking request email for booking {}", booking.getBookingReference());
         String subject = "Booking Request Received";
         send(booking, subject, EmailType.BOOKING_REQUEST_RECEIVED,
-                buildPendingHtml(booking));
+            buildPendingHtml(booking));
+      } catch (RuntimeException ex) {
+        log.error("Could not prepare booking request email for booking {}",
+            booking.getBookingReference(), ex);
+      }
     }
 
-    @Async
+    @Async("emailTaskExecutor")
     public void sendBookingConfirmed(Booking booking) {
       try {
         log.info("Preparing confirmation email for booking {}", booking.getBookingReference());
@@ -78,7 +84,7 @@ public class EmailService {
       }
     }
 
-    @Async
+    @Async("emailTaskExecutor")
     public void sendBookingRejected(Booking booking) {
         String subject = "Booking Request Update";
         send(booking, subject, EmailType.BOOKING_REJECTED,
@@ -130,7 +136,8 @@ public class EmailService {
             }
             entry.setStatus(EmailStatus.FAILED);
             entry.setErrorMessage(errMsg);
-            log.error("Email [{}] FAILED for booking {}: {}", type, booking.getBookingReference(), ex.getMessage());
+            log.error("Email [{}] FAILED for booking {}: {}", type,
+                    booking.getBookingReference(), ex.getMessage(), ex);
         } finally {
             emailLogRepository.save(entry);
         }
