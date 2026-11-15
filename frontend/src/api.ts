@@ -8,6 +8,10 @@ const _rawApiUrl =
 
 const API = _rawApiUrl.replace(/\/$/, '')
 
+const FIRST_ATTEMPT_TIMEOUT_MS = 45_000
+const RETRY_TIMEOUT_MS = 30_000
+const RETRY_DELAYS_MS = [2_000, 4_000, 8_000]
+
 // Emit once so the Network tab URL-prefix and this value can be cross-checked.
 // If this prints "(empty — same-origin)" in production it means VITE_API_BASE_URL
 // was not set at build time — the most common cause of the "Unable to load availability" error.
@@ -24,8 +28,36 @@ console.info(
 )
 
 const AVAILABILITY_CACHE_MS   = 30_000
-const AVAILABILITY_TIMEOUT_MS = 30_000
 const availabilityCache = new Map<string, { expiresAt: number | null; request: Promise<AvailabilityResponse> }>()
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const method = (init.method ?? 'GET').toUpperCase()
+  const retryDelays = ['GET', 'HEAD', 'OPTIONS'].includes(method) ? RETRY_DELAYS_MS : []
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: AbortSignal.timeout(attempt === 0 ? FIRST_ATTEMPT_TIMEOUT_MS : RETRY_TIMEOUT_MS),
+      })
+      const shouldRetry = (response.status === 408 || response.status === 429 || response.status >= 500)
+        && attempt < retryDelays.length
+      if (!shouldRetry) return response
+      await delay(retryDelays[attempt])
+    } catch (error) {
+      if (attempt >= retryDelays.length) throw error
+      await delay(retryDelays[attempt])
+    }
+  }
+}
+
+export function wakeUpServer(): void {
+  void fetchWithRetry(`${API}/actuator/health`).catch(() => undefined)
+}
 
 function authHeader(): Record<string, string> {
   const token = localStorage.getItem('yabera_admin_token')
@@ -56,7 +88,7 @@ export async function fetchAvailability(from: string, to: string, forceRefresh =
 
   console.info('[api] fetchAvailability →', url)
 
-  const request = fetch(url, { signal: AbortSignal.timeout(AVAILABILITY_TIMEOUT_MS) })
+  const request = fetchWithRetry(url)
     .then(async (response) => {
       console.info('[api] fetchAvailability ←', response.status, response.url)
 
@@ -85,7 +117,7 @@ export async function fetchAvailability(from: string, to: string, forceRefresh =
 
       // Distinguish the three common failure modes and log clearly
       if (error instanceof DOMException && error.name === 'TimeoutError') {
-        console.error(`[api] fetchAvailability TIMEOUT after ${AVAILABILITY_TIMEOUT_MS}ms — backend may be sleeping (cold start). URL: ${url}`)
+        console.error(`[api] fetchAvailability TIMEOUT — backend may be sleeping (cold start). URL: ${url}`)
       } else if (error instanceof TypeError && error.message.toLowerCase().includes('fetch')) {
         console.error(
           `[api] fetchAvailability NETWORK ERROR — possible causes:\n` +
@@ -115,7 +147,7 @@ export async function createBooking(payload: {
   message?: string
 }) {
   const created = await parse<BookingCreateResponse>(
-    await fetch(`${API}/api/bookings`, {
+    await fetchWithRetry(`${API}/api/bookings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -127,7 +159,7 @@ export async function createBooking(payload: {
 
 export async function adminLogin(username: string, password: string) {
   const data = await parse<{ token: string; username: string }>(
-    await fetch(`${API}/api/auth/login`, {
+    await fetchWithRetry(`${API}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -143,7 +175,7 @@ export function adminLogout() {
 
 export async function fetchAdminBookings() {
   return parse<Booking[]>(
-    await fetch(`${API}/api/admin/bookings`, {
+    await fetchWithRetry(`${API}/api/admin/bookings`, {
       headers: { ...authHeader() },
     }),
   )
@@ -151,7 +183,7 @@ export async function fetchAdminBookings() {
 
 export async function updateBookingStatus(id: number, status: BookingStatus) {
   return parse<Booking>(
-    await fetch(`${API}/api/admin/bookings/${id}/status`, {
+    await fetchWithRetry(`${API}/api/admin/bookings/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ status }),
@@ -161,7 +193,7 @@ export async function updateBookingStatus(id: number, status: BookingStatus) {
 
 export async function fetchBlockedDates() {
   return parse<BlockedDate[]>(
-    await fetch(`${API}/api/admin/blocked-dates`, {
+    await fetchWithRetry(`${API}/api/admin/blocked-dates`, {
       headers: { ...authHeader() },
     }),
   )
@@ -169,7 +201,7 @@ export async function fetchBlockedDates() {
 
 export async function createBlockedDates(payload: { startDate: string; endDate: string; reason: string }) {
   return parse<BlockedDate>(
-    await fetch(`${API}/api/admin/blocked-dates`, {
+    await fetchWithRetry(`${API}/api/admin/blocked-dates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify(payload),
@@ -178,7 +210,7 @@ export async function createBlockedDates(payload: { startDate: string; endDate: 
 }
 
 export async function deleteBlockedDates(id: number) {
-  const response = await fetch(`${API}/api/admin/blocked-dates/${id}`, {
+  const response = await fetchWithRetry(`${API}/api/admin/blocked-dates/${id}`, {
     method: 'DELETE',
     headers: { ...authHeader() },
   })

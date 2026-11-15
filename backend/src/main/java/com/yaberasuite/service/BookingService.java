@@ -121,7 +121,8 @@ public class BookingService {
         log.info(sw.prettyPrint());
 
         // Notify guest — runs on a background thread, does not block the response
-        emailService.sendBookingRequestReceived(booking);
+        Booking createdBooking = booking;
+        dispatchEmail(() -> emailService.sendBookingRequestReceived(createdBooking), createdBooking.getBookingReference());
 
         return new BookingCreateResponse(toResponse(booking), BookingStatus.AWAITING_PAYMENT);
     }
@@ -177,12 +178,39 @@ public class BookingService {
 
         // Notify guest of status change — runs on a background thread
         if (status == BookingStatus.CONFIRMED) {
-            emailService.sendBookingConfirmed(saved);
+            dispatchEmail(() -> emailService.sendBookingConfirmed(saved), saved.getBookingReference());
         } else if (status == BookingStatus.REJECTED) {
-            emailService.sendBookingRejected(saved);
+            dispatchEmail(() -> emailService.sendBookingRejected(saved), saved.getBookingReference());
         }
 
         return toResponse(saved);
+    }
+
+    @Transactional
+    public BookingResponse confirm(Long id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Booking not found."));
+
+        if (booking.getStatus() == BookingStatus.CONFIRMED) {
+            return toResponse(booking);
+        }
+        if (booking.getStatus() != BookingStatus.AWAITING_PAYMENT) {
+            throw new ApiException("Only bookings awaiting payment can be confirmed through this endpoint.");
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+        Booking saved = bookingRepository.save(booking);
+        log.info("Booking {} confirmed", saved.getBookingReference());
+        dispatchEmail(() -> emailService.sendBookingConfirmed(saved), saved.getBookingReference());
+        return toResponse(saved);
+    }
+
+    private void dispatchEmail(Runnable emailDispatch, String bookingReference) {
+        try {
+            emailDispatch.run();
+        } catch (RuntimeException ex) {
+            log.error("Could not queue email for booking {}", bookingReference, ex);
+        }
     }
 
     private void validateStay(LocalDate checkIn, LocalDate checkOut, int guests) {

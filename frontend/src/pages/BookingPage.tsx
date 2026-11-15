@@ -183,6 +183,12 @@ export default function BookingPage() {
           })}
         </div>
 
+        {availabilityState === 'loading' && (
+          <p className="mt-4 text-sm text-ink-700" role="status" aria-live="polite">
+            Waking up the server, please wait...
+          </p>
+        )}
+
         {/* Load error */}
         {availabilityState === 'error' && (
           <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800">

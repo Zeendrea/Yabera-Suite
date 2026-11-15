@@ -44,6 +44,8 @@ public class SecurityConfig {
                     response.getWriter().write("{\"message\":\"Please sign in as the host.\"}");
                 }))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                    .requestMatchers("/api/bookings/*/confirm").hasRole("ADMIN")
                         .requestMatchers("/error", "/api/auth/login", "/api/public/**", "/api/bookings").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/availability").permitAll()

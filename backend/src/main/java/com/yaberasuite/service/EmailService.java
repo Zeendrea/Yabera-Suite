@@ -6,24 +6,21 @@ import com.yaberasuite.domain.EmailLog;
 import com.yaberasuite.domain.EmailStatus;
 import com.yaberasuite.domain.EmailType;
 import com.yaberasuite.repo.EmailLogRepository;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClient;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Path;
 import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Sends booking notification emails and records every attempt in email_log.
@@ -31,9 +28,7 @@ import java.util.Locale;
  * <p>All send methods are {@code @Async} so they never block the HTTP request
  * thread. Status is recorded as PENDING → SENT or FAILED.
  *
- * <p>Payment flow: a {@code BOOKING_REQUEST_RECEIVED} email is the only email
- * type that carries the PSBank QR payment code (inline + attachment). Confirmed
- * and rejected emails never include payment collateral.
+ * <p>Messages are delivered through Brevo's HTTP API so SMTP is not required.
  */
 @Service
 public class EmailService {
@@ -45,16 +40,28 @@ public class EmailService {
     private static final int RATE_DISCOUNT = 1799;
     private static final int EXTRA_GUEST_FEE = 300;
 
-    private final JavaMailSender mailSender;
     private final EmailLogRepository emailLogRepository;
     private final YaberaProperties props;
+    private final RestClient brevoClient;
+    private final String brevoApiKey;
+    private final String senderEmail;
+    private final String frontendUrl;
+    private final String checkInInstructions;
 
-    public EmailService(JavaMailSender mailSender,
+    public EmailService(RestClient.Builder restClientBuilder,
                         EmailLogRepository emailLogRepository,
-                        YaberaProperties props) {
-        this.mailSender = mailSender;
+              YaberaProperties props,
+              @Value("${brevo.api-key:}") String brevoApiKey,
+              @Value("${mail.sender:}") String senderEmail,
+              @Value("${app.frontend-url:}") String frontendUrl,
+              @Value("${app.check-in-instructions:}") String checkInInstructions) {
         this.emailLogRepository = emailLogRepository;
         this.props = props;
+      this.brevoClient = restClientBuilder.baseUrl("https://api.brevo.com").build();
+      this.brevoApiKey = brevoApiKey;
+      this.senderEmail = senderEmail;
+      this.frontendUrl = frontendUrl.replaceAll("/+$", "");
+      this.checkInInstructions = checkInInstructions;
     }
 
     // ── Public trigger methods (called from BookingService) ─────────────────────
@@ -86,50 +93,29 @@ public class EmailService {
 
     @Async("emailTaskExecutor")
     public void sendBookingRejected(Booking booking) {
-        String subject = "Booking Request Update";
-        send(booking, subject, EmailType.BOOKING_REJECTED,
-                buildRejectedHtml(booking));
+      try {
+        send(booking, "Booking Request Update", EmailType.BOOKING_REJECTED,
+            buildRejectedHtml(booking));
+      } catch (RuntimeException ex) {
+        log.error("Could not prepare rejection email for booking {}", booking.getBookingReference(), ex);
+      }
     }
 
     // ── Internal send + log ──────────────────────────────────────────────────────
 
     private void send(Booking booking, String subject, EmailType type, String html) {
         String to = booking.getEmail();
-        String from = props.getMail().getFrom();
-
         // Record attempt as PENDING first
         EmailLog entry = new EmailLog(booking.getBookingReference(), to, subject, type, EmailStatus.PENDING);
         entry = emailLogRepository.save(entry);
 
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(from);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(html, true); // true = isHtml
-
-            // Only booking-request emails carry the PSBank payment QR — never on
-            // confirmation or rejection emails.
-            if (type == EmailType.BOOKING_REQUEST_RECEIVED) {
-                Resource qrResource = resolveQrCodeResource();
-                if (qrResource != null) {
-                    helper.addInline("qrpayment", qrResource, "image/jpeg");
-                    helper.addAttachment("PSBank-QR-Payment.jpg", qrResource);
-                  log.info("Attached payment QR for booking {} from {}", booking.getBookingReference(), qrResource.getDescription());
-                } else {
-                    log.warn("Booking request email for {} sent WITHOUT a QR code image — "
-                            + "guest will not see a scannable payment option.",
-                            booking.getBookingReference());
-                }
-            }
-
-            mailSender.send(message);
+          sendEmail(to, subject, html);
 
             entry.setStatus(EmailStatus.SENT);
             log.info("Email [{}] sent to {} for booking {}", type, to, booking.getBookingReference());
 
-        } catch (MessagingException | RuntimeException ex) {
+        } catch (RuntimeException ex) {
             String errMsg = ex.getMessage();
             if (errMsg != null && errMsg.length() > 500) {
                 errMsg = errMsg.substring(0, 500);
@@ -143,6 +129,21 @@ public class EmailService {
         }
     }
 
+      private void sendEmail(String to, String subject, String htmlContent) {
+        brevoClient.post()
+            .uri("/v3/smtp/email")
+            .header("api-key", brevoApiKey)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of(
+                "sender", Map.of("name", props.getProperty().getName(), "email", senderEmail),
+                "to", List.of(Map.of("email", to)),
+                "subject", subject,
+                "htmlContent", htmlContent
+            ))
+            .retrieve()
+            .toBodilessEntity();
+      }
+
     // ── HTML template builders ───────────────────────────────────────────────────
 
     private String buildPendingHtml(Booking b) {
@@ -154,11 +155,13 @@ public class EmailService {
         String nightsText = price.nights + (price.nights == 1 ? " night" : " nights");
         String totalText = formatPeso(price.total);
 
-        String qrMarkup = "<img src=\"cid:qrpayment\" alt=\"Payment QR code\" width=\"220\" style=\"display:block;width:220px;max-width:100%;height:auto;margin:0 auto 10px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;\">";
+        String qrMarkup = "<img src=\"%s/payment-qr.png\" alt=\"Payment QR code\" width=\"220\" style=\"display:block;width:220px;max-width:100%%;height:auto;margin:0 auto 10px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;\">"
+          .formatted(escapeHtml(frontendUrl));
 
         return wrap(propertyName, """
+          <h1 style="color:#1f2937;font-size:26px;line-height:1.3;margin:0 0 18px">Booking Request Submitted!</h1>
                 <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 12px">
-                  Hello <strong>%s</strong>,
+            Hello <strong>%s</strong>,
                 </p>
                 <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 20px">
                   Thank you for your booking request. We have received your request for:
@@ -184,7 +187,7 @@ public class EmailService {
                 </table>
 
                 <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px;margin:0 0 24px;color:#9a3412">
-                  <p style="margin:0;font-size:16px;line-height:1.6">Your booking is currently <strong>awaiting payment</strong>.</p>
+                  <p style="margin:0;font-size:16px;line-height:1.6">Status: <strong>Awaiting Payment</strong>.</p>
                   <p style="margin:6px 0 0;font-size:14px;line-height:1.6">This request is not confirmed yet.</p>
                 </div>
 
@@ -226,14 +229,12 @@ public class EmailService {
                   <p style="margin:0 0 10px;color:#9a3412;font-size:16px;font-weight:700">Payment First Policy</p>
                   <p style="margin:0 0 10px;color:#7c2d12;font-size:15px;line-height:1.6"><strong>Payment must be completed within 24 hours after submitting your booking request.</strong></p>
                   <p style="margin:0 0 12px;color:#4b5563;font-size:15px;line-height:1.6">Your booking is not confirmed until payment has been verified by Yabera Suite.</p>
-                  <p style="margin:0 0 8px;color:#1f2937;font-size:15px;font-weight:700">How to complete your payment:</p>
+                  <p style="margin:0 0 8px;color:#1f2937;font-size:15px;font-weight:700">What happens next</p>
                   <ol style="margin:0;padding-left:20px;color:#4b5563;font-size:15px;line-height:1.8">
-                    <li>Complete the payment using the QR code.</li>
-                    <li>Take a screenshot of your payment receipt.</li>
-                    <li>Reply to this email and attach the screenshot.</li>
-                    <li>Wait for Yabera Suite to verify your payment.</li>
+                    <li>Complete your payment and reply to this email with a screenshot of the receipt.</li>
+                    <li>Yabera Suite will manually verify your payment.</li>
+                    <li>The host will confirm your booking and send your check-in details.</li>
                   </ol>
-                  <p style="margin:12px 0 0;color:#4b5563;font-size:15px;line-height:1.6">Once we verify your payment, we will send you a Booking Confirmation email.</p>
                 </div>
 
                 <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
@@ -245,7 +246,7 @@ public class EmailService {
                   We will send you a confirmation as soon as your payment has been verified.
                 </p>
                 """.formatted(
-                b.getGuestName(),
+                escapeHtml(b.getGuestName()),
                 b.getCheckIn().format(DATE_FMT),
                 b.getCheckOut().format(DATE_FMT),
                 b.getNumberOfGuests(),
@@ -256,36 +257,6 @@ public class EmailService {
                 qrMarkup,
                 bookingRef
         ));
-    }
-
-    private Resource resolveQrCodeResource() {
-            String configuredPath = props.getMail().getQrPath();
-            if (configuredPath != null && !configuredPath.isBlank()) {
-                  Resource configured = configuredPath.startsWith("classpath:")
-                  ? new ClassPathResource(configuredPath.substring("classpath:".length()))
-                  : new FileSystemResource(Path.of(configuredPath).toAbsolutePath().normalize());
-              if (configured.exists() && configured.isReadable()) {
-                return configured;
-              }
-              log.error("Configured payment QR image is missing or unreadable: {}", configuredPath);
-            }
-
-        Resource bundledResource = new ClassPathResource("static/images/QR-Payment.jpg");
-        if (bundledResource.exists() && bundledResource.isReadable()) {
-            return bundledResource;
-        }
-
-        Path frontendPath = Path.of("..", "frontend", "public", "images", "QR-Payment.jpg")
-                .toAbsolutePath()
-                .normalize();
-        Resource frontendResource = new FileSystemResource(frontendPath);
-        if (frontendResource.exists() && frontendResource.isReadable()) {
-            return frontendResource;
-        }
-
-        log.error("Payment QR image not found. Checked configured path, classpath resource "
-                + "static/images/QR-Payment.jpg and filesystem path {}", frontendPath);
-        return null;
     }
 
     private PriceSummary computePriceSummary(Booking booking) {
@@ -324,6 +295,14 @@ public class EmailService {
         return "₱" + NumberFormat.getNumberInstance(Locale.US).format(amount);
     }
 
+    private String escapeHtml(String value) {
+      return value == null ? "" : value.replace("&", "&amp;")
+          .replace("<", "&lt;")
+          .replace(">", "&gt;")
+          .replace("\"", "&quot;")
+          .replace("'", "&#39;");
+    }
+
     private static class PriceSummary {
       private final int nights;
         private final int roomTotal;
@@ -340,8 +319,9 @@ public class EmailService {
 
     private String buildConfirmedHtml(Booking b) {
         String propertyName = props.getProperty().getName();
-        String hostEmail    = props.getMail().getFrom();
+      String hostEmail    = senderEmail;
         int nights = b.getNights() != null ? b.getNights() : 0;
+      String totalPaid = formatPeso(b.getTotalAmount() == null ? 0 : b.getTotalAmount());
 
         return wrap(propertyName, """
                 <!-- Greeting -->
@@ -384,6 +364,10 @@ public class EmailService {
                     </td>
                   </tr>
                 </table>
+
+                <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 28px">
+                  Total paid: <strong style="color:#1f2937">%s</strong>
+                </p>
 
                 <!-- ── Property Details ── -->
                 <p style="color:#1f2937;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px">Property</p>
@@ -445,20 +429,25 @@ public class EmailService {
                   </tr>
                 </table>
 
+                <p style="color:#1f2937;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px">Check-in Instructions</p>
+                <p style="color:#4b5563;font-size:15px;line-height:1.7;margin:0 0 28px;white-space:pre-line">%s</p>
+
                 <p style="color:#4b5563;font-size:15px;line-height:1.7;margin:0">
                   Thank you for choosing <strong>%s</strong>. See you soon!<br>
                   <span style="color:#9ca3af;font-size:13px">— The %s Team</span>
                 </p>
                 """.formatted(
-                b.getGuestName(),
+                escapeHtml(b.getGuestName()),
                 propertyName,
                 b.getBookingReference(),
                 b.getNumberOfGuests(), b.getNumberOfGuests() == 1 ? "" : "s",
                 b.getCheckIn().format(DATE_FMT),
                 b.getCheckOut().format(DATE_FMT),
                 nights, nights == 1 ? "" : "s",
+                totalPaid,
                 propertyName,
                 hostEmail, hostEmail,
+                escapeHtml(checkInInstructions),
                 propertyName,
                 propertyName
         ));
@@ -487,7 +476,7 @@ public class EmailService {
                   Thank you.
                 </p>
                 """.formatted(
-                b.getGuestName(),
+                escapeHtml(b.getGuestName()),
                 b.getBookingReference()
         ));
     }

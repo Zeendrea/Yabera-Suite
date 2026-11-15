@@ -7,11 +7,12 @@ spring:
     username: ${DB_USERNAME:${DB_USER:root}}
     password: ${DB_PASSWORD:${DB_PASS:claireandrea}}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 5
+      minimum-idle: 1
       connection-timeout: 30000
       idle-timeout: 600000
-      max-lifetime: 1800000
+      max-lifetime: 1700000
+      keepalive-time: 300000
       leak-detection-threshold: 20000
   jpa:
     hibernate:
@@ -58,3 +59,15 @@ yabera:
 logging:
   level:
     com.yaberasuite: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+  health:
+    db:
+      enabled: true
