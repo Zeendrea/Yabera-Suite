@@ -36,6 +36,7 @@ export interface Booking {
   extraGuestTotal: number | null
   totalAmount: number | null
   message?: string | null
+  rejectionReason?: string | null
   status: BookingStatus
   createdAt: string
   updatedAt: string

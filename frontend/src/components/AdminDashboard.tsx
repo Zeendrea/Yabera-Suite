@@ -35,7 +35,7 @@ const ICONS = {
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
-export type StatusFilter = BookingStatus | 'ALL'
+export type StatusFilter = 'ALL' | 'AWAITING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'REJECTED'
 // TabKey is owned by BookingTable; StatusFilter kept for metric cards only
 
 // ── Admin Nav Header ────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ export default function AdminDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [blocks, setBlocks] = useState<BlockedDate[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>('ALL')
+  const [activeFilter, setActiveFilter] = useState<StatusFilter>('AWAITING_PAYMENT')
 
   async function load() {
     try {
@@ -175,9 +175,12 @@ export default function AdminDashboard() {
     void load()
   }, [navigate])
 
-  async function onStatus(id: number, status: BookingStatus) {
-    await updateBookingStatus(id, status)
-    await load()
+  async function onStatus(id: number, status: BookingStatus, reason?: string) {
+    try {
+      await updateBookingStatus(id, status, reason)
+    } finally {
+      await load()
+    }
   }
 
   function handleLogout() {
@@ -189,7 +192,7 @@ export default function AdminDashboard() {
   const today = new Date().toISOString().slice(0, 10)
   const metrics = {
     total:     bookings.length,
-    pending:   bookings.filter((b) => b.status === 'AWAITING_PAYMENT').length,
+    pending:   bookings.filter((b) => ['AWAITING_PAYMENT', 'PENDING', 'PAYMENT_SUBMITTED', 'PAYMENT_VERIFIED'].includes(b.status)).length,
     confirmed: bookings.filter((b) => b.status === 'CONFIRMED').length,
     checkIns:  bookings.filter((b) => b.status === 'CONFIRMED' && b.checkIn >= today).length,
     checkOuts: bookings.filter((b) => b.status === 'CONFIRMED' && b.checkOut >= today).length,

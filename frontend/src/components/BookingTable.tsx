@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatLong } from '../dates'
 import type { Booking, BookingStatus } from '../types'
 import StatusBadge from './StatusBadge'
@@ -10,10 +10,14 @@ import StatusBadge from './StatusBadge'
 const PAGE_SIZE = 8
 
 // Tab definitions — what each tab shows
-export type TabKey = BookingStatus | 'ALL'
+export type TabKey = 'ALL' | 'AWAITING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'REJECTED'
 
 function tabFilter(tab: TabKey, booking: Booking): boolean {
-  return tab === 'ALL' || booking.status === tab
+  if (tab === 'ALL') return true
+  if (tab === 'AWAITING_PAYMENT') {
+    return ['AWAITING_PAYMENT', 'PENDING', 'PAYMENT_SUBMITTED', 'PAYMENT_VERIFIED'].includes(booking.status)
+  }
+  return booking.status === tab
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,10 +64,8 @@ const I = {
   search:   'M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0',
   check:    'M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
   xCircle:  'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
-  dots:     'M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2',
   approve:  'M5 13l4 4L19 7',
   reject:   'M6 18L18 6M6 6l12 12',
-  cancel:   'M9 9l6 6m0-6l-6 6',
   chevLeft: 'M15 19l-7-7 7-7',
   chevRight:'M9 5l7 7-7 7',
 }
@@ -108,65 +110,27 @@ function ActionMenu({
   busy: boolean
   onAction: (status: BookingStatus) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const actions: { label: string; status: BookingStatus; icon: string; cls: string }[] = []
-  if (booking.status === 'AWAITING_PAYMENT' || booking.status === 'PENDING') {
-    actions.push({ label: 'Payment submitted', status: 'PAYMENT_SUBMITTED', icon: I.approve, cls: 'text-sky-700 hover:bg-sky-50' })
-    actions.push({ label: 'Reject',  status: 'REJECTED',  icon: I.reject,  cls: 'text-rose-600 hover:bg-rose-50'  })
-  }
-  if (booking.status === 'PAYMENT_SUBMITTED') {
-    actions.push({ label: 'Verify payment', status: 'PAYMENT_VERIFIED', icon: I.approve, cls: 'text-blue-700 hover:bg-blue-50' })
-    actions.push({ label: 'Reject',  status: 'REJECTED',  icon: I.reject,  cls: 'text-rose-600 hover:bg-rose-50'  })
-  }
-  if (booking.status === 'PAYMENT_VERIFIED') {
-    actions.push({ label: 'Confirm booking', status: 'CONFIRMED', icon: I.approve, cls: 'text-green-700 hover:bg-green-50' })
-    actions.push({ label: 'Reject',  status: 'REJECTED',  icon: I.reject,  cls: 'text-rose-600 hover:bg-rose-50'  })
-  }
-  if (booking.status === 'CONFIRMED') {
-    actions.push({ label: 'Cancel',  status: 'CANCELLED', icon: I.cancel,  cls: 'text-rose-600 hover:bg-rose-50'  })
-  }
-
-  if (actions.length === 0) return <span className="text-xs text-[#CCC]">—</span>
+  const canDecide = ['AWAITING_PAYMENT', 'PENDING', 'PAYMENT_SUBMITTED', 'PAYMENT_VERIFIED'].includes(booking.status)
+  if (!canDecide) return <span className="text-xs text-[#CCC]">—</span>
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="flex min-w-[176px] flex-col gap-1.5">
       <button
         disabled={busy}
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Row actions"
-        aria-haspopup="true"
-        aria-expanded={open}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#EDE8E1] bg-white text-[#666] transition-colors hover:border-[#C9B89A] hover:bg-[#FAF7F2] disabled:cursor-not-allowed disabled:opacity-40"
+        onClick={() => onAction('CONFIRMED')}
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4A6A44] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#3D5A37] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {busy
-          ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#CCC] border-t-[#1A1A1A]" />
-          : <Icon d={I.dots} size={14} />}
+        {busy && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />}
+        Confirm payment
       </button>
-
-      {open && (
-        <div className="absolute right-0 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-[#EDE8E1] bg-white shadow-lg">
-          {actions.map((a) => (
-            <button
-              key={a.status}
-              onClick={() => { setOpen(false); onAction(a.status) }}
-              className={`flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${a.cls}`}
-            >
-              <Icon d={a.icon} size={13} />
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <button
+        disabled={busy}
+        onClick={() => onAction('REJECTED')}
+        className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {busy && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-200 border-t-rose-700" aria-hidden="true" />}
+        Reject
+      </button>
     </div>
   )
 }
@@ -178,8 +142,6 @@ function ActionMenu({
 const TAB_META: { key: TabKey; label: string }[] = [
   { key: 'ALL', label: 'All' },
   { key: 'AWAITING_PAYMENT', label: 'Awaiting Payment' },
-  { key: 'PAYMENT_SUBMITTED', label: 'Payment Submitted' },
-  { key: 'PAYMENT_VERIFIED', label: 'Payment Verified' },
   { key: 'CONFIRMED', label: 'Confirmed' },
   { key: 'EXPIRED', label: 'Expired' },
   { key: 'REJECTED', label: 'Rejected' },
@@ -321,15 +283,17 @@ function Pagination({
 
 interface Props {
   bookings: Booking[]
-  onStatus: (id: number, status: BookingStatus) => Promise<void>
+  onStatus: (id: number, status: BookingStatus, reason?: string) => Promise<void>
 }
 
 export default function BookingTable({ bookings, onStatus }: Props) {
-  const [tab, setTab]           = useState<TabKey>('active')
+  const [tab, setTab]           = useState<TabKey>('AWAITING_PAYMENT')
   const [search, setSearch]     = useState('')
   const [page, setPage]         = useState(1)
   const [loadingId, setLoadingId] = useState<number | null>(null)
   const [toasts, setToasts]     = useState<Toast[]>([])
+  const [actionDialog, setActionDialog] = useState<{ booking: Booking; status: 'CONFIRMED' | 'REJECTED' } | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
 
   // Reset to page 1 whenever tab or search changes
   useEffect(() => { setPage(1) }, [tab, search])
@@ -340,21 +304,24 @@ export default function BookingTable({ bookings, onStatus }: Props) {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500)
   }
 
-  async function handleAction(booking: Booking, status: BookingStatus) {
+  function openActionDialog(booking: Booking, status: 'CONFIRMED' | 'REJECTED') {
+    setRejectionReason('')
+    setActionDialog({ booking, status })
+  }
+
+  async function handleAction() {
+    if (!actionDialog) return
+    const { booking, status } = actionDialog
     setLoadingId(booking.id)
     try {
-      await onStatus(booking.id, status)
-      const msgs: Record<BookingStatus, string> = {
-        AWAITING_PAYMENT: '',
-        PAYMENT_SUBMITTED: `Payment marked as submitted for ${booking.bookingReference}.`,
-        PAYMENT_VERIFIED: `Payment verified for ${booking.bookingReference}.`,
-        CONFIRMED: `Booking confirmed — email sent to ${booking.email}.`,
-        EXPIRED: `Booking ${booking.bookingReference} expired.`,
-        REJECTED: `Booking ${booking.bookingReference} rejected.`,
-        PENDING: '',
-        CANCELLED: `Booking ${booking.bookingReference} cancelled.`,
-      }
-      addToast(msgs[status], 'success')
+      await onStatus(booking.id, status, status === 'REJECTED' ? rejectionReason.trim() || undefined : undefined)
+      addToast(
+        status === 'CONFIRMED'
+          ? `Booking ${booking.bookingReference} confirmed. Confirmation email sent.`
+          : `Booking ${booking.bookingReference} rejected. Dates released and guest emailed.`,
+        'success',
+      )
+      setActionDialog(null)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Action failed. Please try again.', 'error')
     } finally {
@@ -364,7 +331,7 @@ export default function BookingTable({ bookings, onStatus }: Props) {
 
   // Tab counts (computed from full list, ignoring search)
   const counts = useMemo<Record<TabKey, number>>(
-    () => Object.fromEntries(TAB_META.map(({ key }) => [key, key === 'ALL' ? bookings.length : bookings.filter((b) => b.status === key).length])) as Record<TabKey, number>,
+    () => Object.fromEntries(TAB_META.map(({ key }) => [key, bookings.filter((booking) => tabFilter(key, booking)).length])) as Record<TabKey, number>,
     [bookings],
   )
 
@@ -393,6 +360,65 @@ export default function BookingTable({ bookings, onStatus }: Props) {
   return (
     <>
       <ToastRack toasts={toasts} />
+
+      {actionDialog && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-6" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && loadingId === null) setActionDialog(null)
+        }}>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="booking-action-title"
+            className="w-full max-w-md rounded-2xl border border-[#EDE8E1] bg-white p-6 shadow-xl"
+          >
+            <h2 id="booking-action-title" className="font-serif text-xl font-semibold text-[#1A1A1A]">
+              {actionDialog.status === 'CONFIRMED' ? 'Confirm payment' : 'Reject booking'}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-[#555]">
+              {actionDialog.status === 'CONFIRMED'
+                ? `Confirm payment for ${actionDialog.booking.bookingReference} (${actionDialog.booking.guestName})? A confirmation email will be sent to the guest.`
+                : `Reject booking ${actionDialog.booking.bookingReference}? A rejection email will be sent and the dates will be released.`}
+            </p>
+
+            {actionDialog.status === 'REJECTED' && (
+              <div className="mt-4">
+                <label htmlFor="rejection-reason" className="block text-sm font-medium text-[#1A1A1A]">
+                  Reason for rejection (optional, will be included in the email to the guest)
+                </label>
+                <textarea
+                  id="rejection-reason"
+                  value={rejectionReason}
+                  maxLength={500}
+                  rows={4}
+                  onChange={(event) => setRejectionReason(event.target.value)}
+                  className="mt-2 w-full resize-y rounded-xl border border-[#E8DFD5] bg-white px-3 py-2 text-sm text-[#1A1A1A] outline-none focus:border-[#1A1A1A] focus:ring-1 focus:ring-[#1A1A1A]"
+                />
+                <p className="mt-1 text-right text-xs text-[#888]">{rejectionReason.length}/500</p>
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={loadingId !== null}
+                onClick={() => setActionDialog(null)}
+                className="rounded-lg border border-[#EDE8E1] bg-white px-4 py-2 text-sm font-medium text-[#555] hover:bg-[#FAF7F2] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={loadingId !== null}
+                onClick={() => void handleAction()}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${actionDialog.status === 'CONFIRMED' ? 'bg-[#4A6A44] hover:bg-[#3D5A37]' : 'bg-rose-700 hover:bg-rose-800'}`}
+              >
+                {loadingId !== null && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />}
+                {actionDialog.status === 'CONFIRMED' ? 'Confirm payment' : 'Reject booking'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-2xl border border-[#EDE8E1] bg-white shadow-sm">
 
@@ -468,6 +494,12 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                             {booking.message}
                           </p>
                         )}
+                        {booking.rejectionReason && (
+                          <div className="mt-1 max-w-[220px] text-xs text-rose-700" title={booking.rejectionReason}>
+                            <span className="font-semibold">Rejection reason: </span>
+                            <span className="whitespace-pre-line">{booking.rejectionReason}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Contact & Email */}
@@ -515,7 +547,7 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                         <ActionMenu
                           booking={booking}
                           busy={busy}
-                          onAction={(status) => handleAction(booking, status)}
+                          onAction={(status) => openActionDialog(booking, status)}
                         />
                       </td>
                     </tr>

@@ -181,12 +181,12 @@ export async function fetchAdminBookings() {
   )
 }
 
-export async function updateBookingStatus(id: number, status: BookingStatus) {
+export async function updateBookingStatus(id: number, status: BookingStatus, reason?: string) {
   return parse<Booking>(
     await fetchWithRetry(`${API}/api/admin/bookings/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...(reason === undefined ? {} : { reason }) }),
     }),
   )
 }

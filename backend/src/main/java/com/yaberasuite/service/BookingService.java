@@ -133,7 +133,7 @@ public class BookingService {
     }
 
     @Transactional
-    public BookingResponse updateStatus(Long id, BookingStatus status) {
+    public BookingResponse updateStatus(Long id, BookingStatus status, String reason) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Booking not found."));
 
@@ -146,6 +146,8 @@ public class BookingService {
                 throw new ApiException("This booking can no longer be rejected.");
             }
             occupancyService.releaseBooking(booking.getId());
+            String trimmedReason = reason == null ? null : reason.trim();
+            booking.setRejectionReason(trimmedReason == null || trimmedReason.isEmpty() ? null : trimmedReason);
             booking.setStatus(BookingStatus.REJECTED);
         } else if (status == BookingStatus.CANCELLED) {
             if (booking.getStatus() != BookingStatus.CONFIRMED) {
@@ -164,8 +166,11 @@ public class BookingService {
             }
             booking.setStatus(BookingStatus.PAYMENT_VERIFIED);
         } else if (status == BookingStatus.CONFIRMED) {
-            if (booking.getStatus() != BookingStatus.PAYMENT_VERIFIED) {
-                throw new ApiException("Payment must be verified before the booking can be confirmed.");
+            if (booking.getStatus() != BookingStatus.AWAITING_PAYMENT
+                    && booking.getStatus() != BookingStatus.PENDING
+                    && booking.getStatus() != BookingStatus.PAYMENT_SUBMITTED
+                    && booking.getStatus() != BookingStatus.PAYMENT_VERIFIED) {
+                throw new ApiException("Only bookings awaiting payment can be confirmed.");
             }
             booking.setStatus(BookingStatus.CONFIRMED);
         } else if (status == BookingStatus.AWAITING_PAYMENT || status == BookingStatus.PENDING
@@ -243,7 +248,8 @@ public class BookingService {
                 booking.getMessage(),
                 booking.getStatus(),
                 booking.getCreatedAt(),
-                booking.getUpdatedAt()
+                booking.getUpdatedAt(),
+                booking.getRejectionReason()
         );
     }
 }
