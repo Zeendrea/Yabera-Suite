@@ -9,7 +9,6 @@ public class YaberaProperties {
     private final Jwt jwt = new Jwt();
     private final Cors cors = new Cors();
     private final Property property = new Property();
-    private final Mail mail = new Mail();
 
     public Admin getAdmin() {
         return admin;
@@ -25,10 +24,6 @@ public class YaberaProperties {
 
     public Property getProperty() {
         return property;
-    }
-
-    public Mail getMail() {
-        return mail;
     }
 
     public static class Admin {
@@ -97,38 +92,4 @@ public class YaberaProperties {
         }
     }
 
-    public static class Mail {
-        /** The "From" address shown in outgoing emails. */
-        private String from;
-
-        /** Admin address that receives internal copies (optional). */
-        private String adminAddress;
-
-        /** Local or classpath path of the QR image embedded in payment emails. */
-        private String qrPath;
-
-        public String getFrom() {
-            return from;
-        }
-
-        public void setFrom(String from) {
-            this.from = from;
-        }
-
-        public String getAdminAddress() {
-            return adminAddress;
-        }
-
-        public void setAdminAddress(String adminAddress) {
-            this.adminAddress = adminAddress;
-        }
-
-        public String getQrPath() {
-            return qrPath;
-        }
-
-        public void setQrPath(String qrPath) {
-            this.qrPath = qrPath;
-        }
-    }
 }

@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestClient;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -58,10 +59,13 @@ public class EmailService {
         this.emailLogRepository = emailLogRepository;
         this.props = props;
       this.brevoClient = restClientBuilder.baseUrl("https://api.brevo.com").build();
-      this.brevoApiKey = brevoApiKey;
-      this.senderEmail = senderEmail;
+        this.brevoApiKey = sanitizeCredential(brevoApiKey);
+        this.senderEmail = sanitizeCredential(senderEmail);
       this.frontendUrl = frontendUrl.replaceAll("/+$", "");
       this.checkInInstructions = checkInInstructions;
+        if (this.brevoApiKey.isBlank() || this.senderEmail.isBlank()) {
+          log.warn("BREVO_API_KEY or MAIL_SENDER_EMAIL is not set, emails will fail");
+        }
     }
 
     // ── Public trigger methods (called from BookingService) ─────────────────────
@@ -115,6 +119,16 @@ public class EmailService {
             entry.setStatus(EmailStatus.SENT);
             log.info("Email [{}] sent to {} for booking {}", type, to, booking.getBookingReference());
 
+        } catch (RestClientResponseException ex) {
+          String statusCode = ex.getStatusCode().toString();
+          String body = ex.getResponseBodyAsString();
+          String errMsg = statusCode + " " + body;
+          if (errMsg.length() > 500) {
+            errMsg = errMsg.substring(0, 500);
+          }
+          entry.setStatus(EmailStatus.FAILED);
+          entry.setErrorMessage(errMsg);
+          log.error("Brevo error for booking {}: {} {}", booking.getBookingReference(), statusCode, body);
         } catch (RuntimeException ex) {
             String errMsg = ex.getMessage();
             if (errMsg != null && errMsg.length() > 500) {
@@ -142,6 +156,11 @@ public class EmailService {
             ))
             .retrieve()
             .toBodilessEntity();
+        log.info("Brevo accepted email to {}", to);
+      }
+
+      private String sanitizeCredential(String value) {
+        return value == null ? "" : value.replace(" ", "").replace("\"", "").replace("'", "").trim();
       }
 
     // ── HTML template builders ───────────────────────────────────────────────────

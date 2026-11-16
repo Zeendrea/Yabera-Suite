@@ -24,22 +24,6 @@ spring:
         jdbc:
           time_zone: Asia/Manila
     show-sql: false
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-          ssl:
-            trust: smtp.gmail.com
-        debug: false
-
 yabera:
   admin:
     username: ${ADMIN_USERNAME:admin}
@@ -51,11 +35,6 @@ yabera:
     allowed-origins: ${CORS_ORIGINS:https://yabera-suite.vercel.app,http://localhost:5173,http://127.0.0.1:5173}
   property:
     name: ${PROPERTY_NAME:Yabera Suite}
-  mail:
-    from: ${MAIL_FROM:suitesyabera@gmail.com}
-    admin-address: ${MAIL_ADMIN_ADDRESS:}
-    qr-path: ${YABERA_PAYMENT_QR_PATH:}
-
 logging:
   level:
     com.yaberasuite: INFO

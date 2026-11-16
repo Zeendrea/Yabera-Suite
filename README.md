@@ -54,15 +54,12 @@ Open [http://localhost:5173](http://localhost:5173).
 
 ### Email notifications in production
 
-The backend sends booking-request emails asynchronously through Gmail SMTP. Configure these environment variables on the backend host (for example, Render):
+The backend sends booking emails asynchronously through the Brevo HTTP API. Configure these environment variables on the backend host (for example, Render):
 
-- `MAIL_HOST=smtp.gmail.com`
-- `MAIL_PORT=587`
-- `MAIL_USERNAME` set to the sending Gmail address
-- `MAIL_PASSWORD` set to an app password generated for that same Gmail account
-- `MAIL_FROM` set to the sending Gmail address
-
-After changing the sending Gmail account, generate a new app password for that account and update `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_FROM` on the backend host, then redeploy. Do not put an app password in source control.
+- `BREVO_API_KEY` set to the API key from Brevo
+- `MAIL_SENDER_EMAIL` set to a sender address verified in Brevo
+- `FRONTEND_URL` set to the public frontend origin used to host the payment QR image
+- `CHECK_IN_INSTRUCTIONS` optionally set to the instructions included in booking confirmations
 
 ## Availability rules
 
