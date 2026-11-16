@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ClipboardList, Eye, Search, X } from 'lucide-react'
 import { formatLong } from '../dates'
 import type { Booking, BookingStatus } from '../types'
 import StatusBadge from './StatusBadge'
@@ -36,6 +37,21 @@ function formatRequested(iso: string) {
       hour12: true,
     })
     .replace(',', ' ·') // "Sep 24 · 11:44 AM"
+}
+
+function formatPeso(amount: number | null) {
+  return amount == null ? '—' : `₱${amount.toLocaleString('en-US')}`
+}
+
+function Detail({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
+  return (
+    <div className="flex min-w-0 items-start justify-between gap-4 py-2.5">
+      <dt className="shrink-0 text-xs text-[#81776D]">{label}</dt>
+      <dd className={`break-words text-right text-sm ${emphasized ? 'font-semibold text-[#654B3B]' : 'font-medium text-[#302D29]'}`}>
+        {value}
+      </dd>
+    </div>
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,16 +94,16 @@ interface Toast { id: number; message: string; type: 'success' | 'error' }
 
 function ToastRack({ toasts }: { toasts: Toast[] }) {
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2" aria-live="polite">
+    <div className="fixed bottom-4 left-4 right-4 z-50 flex flex-col gap-2 sm:bottom-6 sm:left-auto sm:right-6" aria-live="polite">
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex max-w-sm items-start gap-3 rounded-2xl px-4 py-3 text-sm font-medium shadow-lg
+          className={`flex w-full max-w-sm items-start gap-3 rounded-xl px-4 py-3 text-sm font-medium shadow-lg sm:w-auto
             ${t.type === 'success'
-              ? 'border border-[#D4E8CC] bg-white text-[#1A1A1A]'
-              : 'border border-rose-200 bg-rose-50 text-rose-800'}`}
+              ? 'border border-[#D8E3D0] bg-white text-[#302D29]'
+              : 'border border-[#E8C9C0] bg-[#FBF0ED] text-[#8B4439]'}`}
         >
-          <span className={`mt-0.5 shrink-0 ${t.type === 'success' ? 'text-green-600' : 'text-rose-500'}`}>
+          <span className={`mt-0.5 shrink-0 ${t.type === 'success' ? 'text-[#52704B]' : 'text-[#9B4F42]'}`}>
             <Icon d={t.type === 'success' ? I.check : I.xCircle} size={15} />
           </span>
           <span>{t.message}</span>
@@ -160,7 +176,7 @@ function TabBar({
     <div
       role="tablist"
       aria-label="Booking views"
-      className="flex flex-wrap gap-1 border-b border-[#EDE8E1] bg-[#FAF7F2] px-4 pt-3"
+      className="flex gap-1 overflow-x-auto border-b border-[#EAE2D8] bg-white px-3 pt-3 sm:px-5"
     >
       {TAB_META.map(({ key, label }) => {
         const isActive = active === key
@@ -170,15 +186,15 @@ function TabBar({
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(key)}
-            className={`relative mb-[-1px] flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A1A]
+            className={`relative mb-[-1px] flex shrink-0 items-center gap-2 rounded-t-lg px-3 py-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B68B53] sm:px-4
               ${isActive
-                ? 'border border-b-white border-[#EDE8E1] bg-white text-[#1A1A1A]'
-                : 'border border-transparent text-[#888] hover:text-[#1A1A1A]'}`}
+                ? 'border border-b-white border-[#EAE2D8] bg-white text-[#654B3B]'
+                : 'border border-transparent text-[#81776D] hover:text-[#252321]'}`}
           >
             {label}
             <span
-              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none
-                ${isActive ? 'bg-[#1A1A1A] text-white' : 'bg-[#E8E0D8] text-[#888]'}`}
+              className={`rounded-full px-1.5 py-1 text-[10px] font-bold leading-none
+                ${isActive ? 'bg-[#EDE5D9] text-[#654B3B]' : 'bg-[#F3F0EB] text-[#81776D]'}`}
             >
               {counts[key]}
             </span>
@@ -209,21 +225,21 @@ function Pagination({
   const last  = Math.min(page * pageSize, total)
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#EDE8E1] bg-[#FAF7F2] px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#EAE2D8] bg-[#FAF8F4] px-4 py-3.5">
       {/* Row indicator */}
-      <p className="text-xs text-[#888]">
+      <p className="text-xs text-[#81776D]">
         {total === 0
           ? 'No bookings'
           : `Showing ${first}–${last} of ${total} ${total === 1 ? 'booking' : 'bookings'}`}
       </p>
 
       {/* Controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => onChange(page - 1)}
           disabled={page <= 1}
           aria-label="Previous page"
-          className="flex h-8 items-center gap-1 rounded-lg border border-[#EDE8E1] bg-white px-3 text-xs font-medium text-[#555] transition-colors hover:border-[#C9B89A] hover:bg-[#FAF7F2] disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-8 items-center gap-1 rounded-lg border border-[#E7DED2] bg-white px-3 text-xs font-medium text-[#654B3B] transition-colors hover:border-[#CBB28E] hover:bg-[#F9F6F1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B68B53] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Icon d={I.chevLeft} size={12} />
           Prev
@@ -255,7 +271,7 @@ function Pagination({
                   className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold transition-colors
                     ${page === p
                       ? 'bg-[#1A1A1A] text-white'
-                      : 'border border-[#EDE8E1] bg-white text-[#555] hover:border-[#C9B89A] hover:bg-[#FAF7F2]'}`}
+                      : 'border border-[#E7DED2] bg-white text-[#654B3B] hover:border-[#CBB28E] hover:bg-[#F9F6F1]'}`}
                 >
                   {p}
                 </button>
@@ -267,7 +283,7 @@ function Pagination({
           onClick={() => onChange(page + 1)}
           disabled={page >= totalPages}
           aria-label="Next page"
-          className="flex h-8 items-center gap-1 rounded-lg border border-[#EDE8E1] bg-white px-3 text-xs font-medium text-[#555] transition-colors hover:border-[#C9B89A] hover:bg-[#FAF7F2] disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-8 items-center gap-1 rounded-lg border border-[#E7DED2] bg-white px-3 text-xs font-medium text-[#654B3B] transition-colors hover:border-[#CBB28E] hover:bg-[#F9F6F1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B68B53] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Next
           <Icon d={I.chevRight} size={12} />
@@ -284,18 +300,30 @@ function Pagination({
 interface Props {
   bookings: Booking[]
   onStatus: (id: number, status: BookingStatus) => Promise<void>
+  activeTab: TabKey
+  onTabChange: (tab: TabKey) => void
+  loading: boolean
 }
 
-export default function BookingTable({ bookings, onStatus }: Props) {
-  const [tab, setTab]           = useState<TabKey>('AWAITING_PAYMENT')
+export default function BookingTable({ bookings, onStatus, activeTab: tab, onTabChange, loading }: Props) {
   const [search, setSearch]     = useState('')
   const [page, setPage]         = useState(1)
   const [loadingId, setLoadingId] = useState<number | null>(null)
   const [toasts, setToasts]     = useState<Toast[]>([])
   const [actionDialog, setActionDialog] = useState<{ booking: Booking; status: 'CONFIRMED' | 'REJECTED' } | null>(null)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 
   // Reset to page 1 whenever tab or search changes
   useEffect(() => { setPage(1) }, [tab, search])
+
+  useEffect(() => {
+    if (!selectedBooking) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setSelectedBooking(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [selectedBooking])
 
   function addToast(message: string, type: Toast['type']) {
     const id = Date.now()
@@ -367,12 +395,12 @@ export default function BookingTable({ bookings, onStatus }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="booking-action-title"
-            className="w-full max-w-md rounded-2xl border border-[#EDE8E1] bg-white p-6 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-[#E7DED2] bg-white p-6 shadow-xl"
           >
-            <h2 id="booking-action-title" className="font-serif text-xl font-semibold text-[#1A1A1A]">
+            <h2 id="booking-action-title" className="font-display text-xl font-semibold text-[#252321]">
               {actionDialog.status === 'CONFIRMED' ? 'Confirm payment' : 'Reject booking'}
             </h2>
-            <p className="mt-3 text-sm leading-6 text-[#555]">
+            <p className="mt-3 text-sm leading-6 text-[#75695D]">
               {actionDialog.status === 'CONFIRMED'
                 ? `Confirm payment for ${actionDialog.booking.bookingReference} (${actionDialog.booking.guestName})? A confirmation email will be sent to the guest.`
                 : `Reject booking ${actionDialog.booking.bookingReference}? A rejection email will be sent and the dates will be released.`}
@@ -383,7 +411,7 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                 type="button"
                 disabled={loadingId !== null}
                 onClick={() => setActionDialog(null)}
-                className="rounded-lg border border-[#EDE8E1] bg-white px-4 py-2 text-sm font-medium text-[#555] hover:bg-[#FAF7F2] disabled:opacity-50"
+                className="rounded-lg border border-[#E7DED2] bg-white px-4 py-2 text-sm font-medium text-[#654B3B] transition-colors hover:bg-[#F9F6F1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B68B53] disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -391,7 +419,7 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                 type="button"
                 disabled={loadingId !== null}
                 onClick={() => void handleAction()}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${actionDialog.status === 'CONFIRMED' ? 'bg-[#4A6A44] hover:bg-[#3D5A37]' : 'bg-rose-700 hover:bg-rose-800'}`}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${actionDialog.status === 'CONFIRMED' ? 'bg-[#52704B] hover:bg-[#405B3A] focus-visible:ring-[#52704B]' : 'bg-[#9B4F42] hover:bg-[#813F35] focus-visible:ring-[#9B4F42]'}`}
               >
                 {loadingId !== null && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />}
                 {actionDialog.status === 'CONFIRMED' ? 'Confirm payment' : 'Reject booking'}
@@ -401,48 +429,134 @@ export default function BookingTable({ bookings, onStatus }: Props) {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-[#EDE8E1] bg-white shadow-sm">
+      {selectedBooking && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-[#252321]/40 p-0 sm:items-center sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedBooking(null)
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="booking-details-title"
+            className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+          >
+            <header className="sticky top-0 flex items-start justify-between border-b border-[#EAE2D8] bg-white px-5 py-5 sm:px-7">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9A7546]">Reservation record</p>
+                <h2 id="booking-details-title" className="mt-1 font-display text-2xl font-semibold text-[#252321]">Booking details</h2>
+                <p className="mt-1 font-mono text-sm text-[#75695D]">{selectedBooking.bookingReference}</p>
+              </div>
+              <button
+                onClick={() => setSelectedBooking(null)}
+                className="rounded-lg p-2 text-[#75695D] transition-colors hover:bg-[#F5F1EB] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B68B53]"
+                aria-label="Close booking details"
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="space-y-6 px-5 py-6 sm:px-7">
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9A7546]">Guest</h3>
+                <dl className="mt-3 grid gap-x-8 sm:grid-cols-2">
+                  <Detail label="Guest name" value={selectedBooking.guestName} />
+                  <Detail label="Contact number" value={selectedBooking.contactNumber} />
+                  <Detail label="Email" value={selectedBooking.email} />
+                  <Detail label="Number of guests" value={String(selectedBooking.numberOfGuests)} />
+                </dl>
+              </section>
+
+              <section className="border-t border-[#EEE8E0] pt-5">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9A7546]">Stay</h3>
+                <dl className="mt-3 grid gap-x-8 sm:grid-cols-2">
+                  <Detail label="Check-in" value={formatLong(selectedBooking.checkIn)} />
+                  <Detail label="Check-out" value={formatLong(selectedBooking.checkOut)} />
+                  <Detail label="Number of nights" value={String(selectedBooking.nights)} />
+                  <div className="py-2">
+                    <dt className="text-xs text-[#8A8178]">Status</dt>
+                    <dd className="mt-1"><StatusBadge status={selectedBooking.status} /></dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section className="border-t border-[#EEE8E0] pt-5">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9A7546]">Price breakdown</h3>
+                <dl className="mt-3 divide-y divide-[#F0EAE2] rounded-xl bg-[#FCFBF9] px-4">
+                  <Detail label="Room total" value={formatPeso(selectedBooking.roomTotal)} />
+                  <Detail label="Extra guest fee" value={formatPeso(selectedBooking.extraGuestTotal)} />
+                  <Detail label="Total" value={formatPeso(selectedBooking.totalAmount)} emphasized />
+                </dl>
+              </section>
+
+              <section className="border-t border-[#EEE8E0] pt-5">
+                <Detail label="Created" value={formatRequested(selectedBooking.createdAt)} />
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-[#E7DED2] bg-white shadow-[0_6px_24px_rgba(54,41,28,0.05)]">
 
         {/* ── Tabs ── */}
-        <TabBar active={tab} counts={counts} onChange={setTab} />
+        <TabBar active={tab} counts={counts} onChange={onTabChange} />
 
         {/* ── Search toolbar ── */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-[#EDE8E1] px-4 py-3">
-          <div className="relative flex-1" style={{ minWidth: 200 }}>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#AAA]">
-              <Icon d={I.search} size={14} />
+        <div className="flex flex-wrap items-center gap-3 border-b border-[#EAE2D8] bg-white px-4 py-4 sm:px-5">
+          <div className="relative min-w-[220px] flex-1 sm:max-w-md">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9A8D80]">
+              <Search size={16} strokeWidth={1.8} />
             </span>
             <input
               type="search"
               placeholder="Search by name, email, or reference…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-[#E8DFD5] bg-white py-2 pl-8 pr-3 text-sm outline-none transition-colors placeholder:text-[#BBB] focus:border-[#1A1A1A] focus:ring-1 focus:ring-[#1A1A1A]"
+              className="w-full rounded-xl border border-[#E7DED2] bg-[#FCFBF9] py-2.5 pl-10 pr-3 text-sm text-[#252321] outline-none transition-colors placeholder:text-[#9A9188] focus:border-[#B68B53] focus:bg-white focus:ring-2 focus:ring-[#B68B53]/20"
             />
           </div>
-          <span className="ml-auto text-xs text-[#999]">
+          <span className="ml-auto text-xs font-medium text-[#81776D]">
             {filtered.length} {filtered.length === 1 ? 'booking' : 'bookings'}
           </span>
         </div>
 
         {/* ── Table ── */}
-        {pageSlice.length === 0 ? (
+        {loading ? (
+          <div className="space-y-4 px-5 py-6" role="status" aria-live="polite">
+            <p className="text-sm font-medium text-[#75695D]">Waking up the server, please wait...</p>
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index} className="flex items-center gap-4 border-b border-[#F0EAE2] py-3 last:border-0">
+                <span className="h-4 w-24 animate-pulse rounded bg-[#F0EAE2]" />
+                <span className="h-4 flex-1 animate-pulse rounded bg-[#F0EAE2]" />
+                <span className="h-4 w-20 animate-pulse rounded bg-[#F0EAE2]" />
+              </div>
+            ))}
+          </div>
+        ) : pageSlice.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <p className="text-sm font-medium text-[#999]">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#F3EEE7] text-[#80664D]">
+              <ClipboardList size={21} strokeWidth={1.7} />
+            </span>
+            <p className="mt-4 font-display text-lg font-semibold text-[#302D29]">
               {bookings.length === 0
                 ? 'No booking requests yet.'
                 : 'No bookings match your current view.'}
             </p>
+            <p className="mt-1 text-sm text-[#81776D]">
+              {bookings.length === 0 ? 'New reservations will appear here.' : 'Try a different tab or search term.'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <table className="min-w-[1120px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#EDE8E1] bg-[#FAF7F2]">
+                <tr className="border-b border-[#EAE2D8]">
                   {COLS.map((h) => (
                     <th
                       key={h}
-                      className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#999]"
+                      className="whitespace-nowrap bg-[#FAF8F4] px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#82766B]"
                     >
                       {h}
                     </th>
@@ -453,23 +567,25 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                 {pageSlice.map((booking) => {
                   const busy = loadingId === booking.id
                   return (
-                    <tr
-                      key={booking.id}
-                      className="align-middle transition-colors hover:bg-[#FDFAF6]"
-                    >
+                    <tr key={booking.id} className="align-middle transition-colors hover:bg-[#FCFAF7]">
                       {/* Reference */}
-                      <td className="px-4 py-3.5">
-                        <span className="font-mono text-xs font-semibold text-[#1A1A1A]">
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => setSelectedBooking(booking)}
+                          className="inline-flex whitespace-nowrap items-center gap-1.5 font-mono text-xs font-semibold text-[#654B3B] transition-colors hover:text-[#9A7546] focus:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[#B68B53]"
+                          aria-label={`View details for ${booking.bookingReference}`}
+                        >
                           {booking.bookingReference}
-                        </span>
+                          <Eye size={13} strokeWidth={1.8} />
+                        </button>
                       </td>
 
                       {/* Guest */}
-                      <td className="px-4 py-3.5">
-                        <p className="font-semibold text-[#1A1A1A]">{booking.guestName}</p>
+                      <td className="px-4 py-4">
+                        <p className="whitespace-nowrap font-semibold text-[#302D29]">{booking.guestName}</p>
                         {booking.message && (
                           <p
-                            className="mt-0.5 max-w-[140px] truncate text-xs text-[#999]"
+                            className="mt-1 max-w-[170px] truncate text-xs text-[#897F75]"
                             title={booking.message}
                           >
                             {booking.message}
@@ -478,7 +594,7 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                       </td>
 
                       {/* Contact & Email */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-4">
                         <p className="whitespace-nowrap text-[#1A1A1A]">{booking.contactNumber}</p>
                         <a
                           href={`mailto:${booking.email}`}
@@ -490,35 +606,35 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                       </td>
 
                       {/* Guests */}
-                      <td className="px-4 py-3.5 text-center text-[#1A1A1A]">
+                      <td className="px-4 py-4 text-center text-[#302D29]">
                         {booking.numberOfGuests}
                       </td>
 
                       {/* Dates */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-4">
                         <p className="whitespace-nowrap text-[#1A1A1A]">{formatLong(booking.checkIn)}</p>
                         <p className="whitespace-nowrap text-xs text-[#999]">→ {formatLong(booking.checkOut)}</p>
                       </td>
 
                       {/* Nights */}
-                      <td className="px-4 py-3.5 text-center text-[#1A1A1A]">
+                      <td className="px-4 py-4 text-center text-[#302D29]">
                         {booking.nights}
                       </td>
 
                       {/* Status badge */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-4">
                         <StatusBadge status={booking.status} />
                       </td>
 
                       {/* Date requested */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-4">
                         <p className="whitespace-nowrap text-xs text-[#555]">
                           {formatRequested(booking.createdAt)}
                         </p>
                       </td>
 
                       {/* Actions */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-4">
                         <ActionMenu
                           booking={booking}
                           busy={busy}

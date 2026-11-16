@@ -23,8 +23,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'],
-        display: ['"Fraunces"', 'Georgia', 'serif'],
+        sans: ['Inter', 'Segoe UI', 'sans-serif'],
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
       },
       boxShadow: {
         card: '0 12px 40px rgba(28, 22, 18, 0.08)',

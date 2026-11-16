@@ -1,13 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --yabera-ivory: #F9F6F1;
+  --yabera-beige: #EDE5D9;
+  --yabera-gold: #B68B53;
+  --yabera-brown: #654B3B;
+  --yabera-charcoal: #252321;
+  --yabera-white: #FFFFFF;
+}
 
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  @apply bg-sand-50 text-ink-800 antialiased;
+  @apply antialiased;
+  background-color: var(--yabera-ivory);
+  color: var(--yabera-charcoal);
+  font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
 ::selection {

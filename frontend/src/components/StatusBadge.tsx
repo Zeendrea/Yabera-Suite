@@ -1,21 +1,20 @@
 import type { BookingStatus } from '../types'
 
-// Status colors tuned for the #777C6D / #B7B89F / #CBCBCB / #EEEEEE palette
 const config: Record<BookingStatus, { label: string; cls: string }> = {
-  AWAITING_PAYMENT: { label: 'Awaiting Payment', cls: 'bg-[#FFF8E0] text-[#857830] ring-1 ring-[#D4C878]' },
-  PAYMENT_SUBMITTED: { label: 'Payment Submitted', cls: 'bg-[#EAF2F8] text-[#35617A] ring-1 ring-[#A8C9DC]' },
-  PAYMENT_VERIFIED: { label: 'Payment Verified', cls: 'bg-[#E8F0FA] text-[#365A86] ring-1 ring-[#A8BDD9]' },
-  CONFIRMED: { label: 'Confirmed', cls: 'bg-[#E4EDE0] text-[#4A6A44] ring-1 ring-[#A4C49C]' },
-  EXPIRED: { label: 'Expired', cls: 'bg-[#EEEEEE] text-[#777C6D] ring-1 ring-[#CBCBCB]' },
-  REJECTED: { label: 'Rejected', cls: 'bg-[#F4E8E4] text-[#8A4A3A] ring-1 ring-[#CCA090]' },
-  PENDING: { label: 'Legacy Pending', cls: 'bg-[#FFF8E0] text-[#857830] ring-1 ring-[#D4C878]' },
-  CANCELLED: { label: 'Cancelled', cls: 'bg-[#EEEEEE] text-[#777C6D] ring-1 ring-[#CBCBCB]' },
+  AWAITING_PAYMENT: { label: 'Awaiting Payment', cls: 'bg-[#FBF2DB] text-[#765D24] ring-1 ring-[#E5D29A]' },
+  PAYMENT_SUBMITTED: { label: 'Payment Submitted', cls: 'bg-[#F0EEE8] text-[#6D6256] ring-1 ring-[#D8CFC2]' },
+  PAYMENT_VERIFIED: { label: 'Payment Verified', cls: 'bg-[#F0EEE8] text-[#6D6256] ring-1 ring-[#D8CFC2]' },
+  CONFIRMED: { label: 'Confirmed', cls: 'bg-[#EAF1E7] text-[#45633E] ring-1 ring-[#C5D6BC]' },
+  EXPIRED: { label: 'Expired', cls: 'bg-[#F0EEE9] text-[#68645E] ring-1 ring-[#D8D4CD]' },
+  REJECTED: { label: 'Rejected', cls: 'bg-[#F8EBE8] text-[#8B4439] ring-1 ring-[#E7C8C0]' },
+  PENDING: { label: 'Legacy Pending', cls: 'bg-[#FBF2DB] text-[#765D24] ring-1 ring-[#E5D29A]' },
+  CANCELLED: { label: 'Cancelled', cls: 'bg-[#F0EEE9] text-[#68645E] ring-1 ring-[#D8D4CD]' },
 }
 
 export default function StatusBadge({ status }: { status: BookingStatus }) {
   const { label, cls } = config[status]
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>
       {label}
     </span>
   )
