@@ -49,9 +49,6 @@ public class Booking {
     @Column(length = 1000)
     private String message;
 
-    @Column(name = "rejection_reason", length = 500)
-    private String rejectionReason;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private BookingStatus status;
@@ -160,14 +157,6 @@ public class Booking {
 
     public void setMessage(String message) {
         this.message = message;
-    }
-
-    public String getRejectionReason() {
-        return rejectionReason;
-    }
-
-    public void setRejectionReason(String rejectionReason) {
-        this.rejectionReason = rejectionReason;
     }
 
     public BookingStatus getStatus() {

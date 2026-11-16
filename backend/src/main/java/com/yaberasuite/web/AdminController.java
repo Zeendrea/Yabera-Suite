@@ -39,7 +39,7 @@ public class AdminController {
 
     @PatchMapping("/bookings/{id}/status")
     public BookingResponse updateStatus(@PathVariable Long id, @Valid @RequestBody StatusUpdateRequest request) {
-        return bookingService.updateStatus(id, request.status(), request.reason());
+        return bookingService.updateStatus(id, request.status());
     }
 
     @GetMapping("/blocked-dates")

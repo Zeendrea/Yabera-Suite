@@ -133,7 +133,7 @@ public class BookingService {
     }
 
     @Transactional
-    public BookingResponse updateStatus(Long id, BookingStatus status, String reason) {
+    public BookingResponse updateStatus(Long id, BookingStatus status) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Booking not found."));
 
@@ -146,8 +146,6 @@ public class BookingService {
                 throw new ApiException("This booking can no longer be rejected.");
             }
             occupancyService.releaseBooking(booking.getId());
-            String trimmedReason = reason == null ? null : reason.trim();
-            booking.setRejectionReason(trimmedReason == null || trimmedReason.isEmpty() ? null : trimmedReason);
             booking.setStatus(BookingStatus.REJECTED);
         } else if (status == BookingStatus.CANCELLED) {
             if (booking.getStatus() != BookingStatus.CONFIRMED) {
@@ -248,8 +246,7 @@ public class BookingService {
                 booking.getMessage(),
                 booking.getStatus(),
                 booking.getCreatedAt(),
-                booking.getUpdatedAt(),
-                booking.getRejectionReason()
+                booking.getUpdatedAt()
         );
     }
 }

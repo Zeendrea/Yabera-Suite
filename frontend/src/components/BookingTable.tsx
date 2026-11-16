@@ -283,7 +283,7 @@ function Pagination({
 
 interface Props {
   bookings: Booking[]
-  onStatus: (id: number, status: BookingStatus, reason?: string) => Promise<void>
+  onStatus: (id: number, status: BookingStatus) => Promise<void>
 }
 
 export default function BookingTable({ bookings, onStatus }: Props) {
@@ -293,7 +293,6 @@ export default function BookingTable({ bookings, onStatus }: Props) {
   const [loadingId, setLoadingId] = useState<number | null>(null)
   const [toasts, setToasts]     = useState<Toast[]>([])
   const [actionDialog, setActionDialog] = useState<{ booking: Booking; status: 'CONFIRMED' | 'REJECTED' } | null>(null)
-  const [rejectionReason, setRejectionReason] = useState('')
 
   // Reset to page 1 whenever tab or search changes
   useEffect(() => { setPage(1) }, [tab, search])
@@ -305,7 +304,6 @@ export default function BookingTable({ bookings, onStatus }: Props) {
   }
 
   function openActionDialog(booking: Booking, status: 'CONFIRMED' | 'REJECTED') {
-    setRejectionReason('')
     setActionDialog({ booking, status })
   }
 
@@ -314,7 +312,7 @@ export default function BookingTable({ bookings, onStatus }: Props) {
     const { booking, status } = actionDialog
     setLoadingId(booking.id)
     try {
-      await onStatus(booking.id, status, status === 'REJECTED' ? rejectionReason.trim() || undefined : undefined)
+      await onStatus(booking.id, status)
       addToast(
         status === 'CONFIRMED'
           ? `Booking ${booking.bookingReference} confirmed. Confirmation email sent.`
@@ -379,23 +377,6 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                 ? `Confirm payment for ${actionDialog.booking.bookingReference} (${actionDialog.booking.guestName})? A confirmation email will be sent to the guest.`
                 : `Reject booking ${actionDialog.booking.bookingReference}? A rejection email will be sent and the dates will be released.`}
             </p>
-
-            {actionDialog.status === 'REJECTED' && (
-              <div className="mt-4">
-                <label htmlFor="rejection-reason" className="block text-sm font-medium text-[#1A1A1A]">
-                  Reason for rejection (optional, will be included in the email to the guest)
-                </label>
-                <textarea
-                  id="rejection-reason"
-                  value={rejectionReason}
-                  maxLength={500}
-                  rows={4}
-                  onChange={(event) => setRejectionReason(event.target.value)}
-                  className="mt-2 w-full resize-y rounded-xl border border-[#E8DFD5] bg-white px-3 py-2 text-sm text-[#1A1A1A] outline-none focus:border-[#1A1A1A] focus:ring-1 focus:ring-[#1A1A1A]"
-                />
-                <p className="mt-1 text-right text-xs text-[#888]">{rejectionReason.length}/500</p>
-              </div>
-            )}
 
             <div className="mt-5 flex justify-end gap-2">
               <button
@@ -493,12 +474,6 @@ export default function BookingTable({ bookings, onStatus }: Props) {
                           >
                             {booking.message}
                           </p>
-                        )}
-                        {booking.rejectionReason && (
-                          <div className="mt-1 max-w-[220px] text-xs text-rose-700" title={booking.rejectionReason}>
-                            <span className="font-semibold">Rejection reason: </span>
-                            <span className="whitespace-pre-line">{booking.rejectionReason}</span>
-                          </div>
                         )}
                       </td>
 

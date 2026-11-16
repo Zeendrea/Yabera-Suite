@@ -21,7 +21,6 @@ public record BookingResponse(
         String message,
         BookingStatus status,
         Instant createdAt,
-        Instant updatedAt,
-        String rejectionReason
+        Instant updatedAt
 ) {
 }

@@ -175,9 +175,9 @@ export default function AdminDashboard() {
     void load()
   }, [navigate])
 
-  async function onStatus(id: number, status: BookingStatus, reason?: string) {
+  async function onStatus(id: number, status: BookingStatus) {
     try {
-      await updateBookingStatus(id, status, reason)
+      await updateBookingStatus(id, status)
     } finally {
       await load()
     }

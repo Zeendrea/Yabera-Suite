@@ -474,19 +474,6 @@ public class EmailService {
 
     private String buildRejectedHtml(Booking b) {
         String propertyName = props.getProperty().getName();
-        String rejectionMessage = b.getRejectionReason() == null || b.getRejectionReason().isBlank()
-                ? """
-                <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 24px">
-                  Unfortunately, the selected dates are <strong>unavailable</strong>.
-                  Please visit our website to choose other available dates.
-                </p>
-                """
-                : """
-                <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px;margin:0 0 24px">
-                  <p style="margin:0 0 8px;color:#9a3412;font-size:15px;font-weight:700">Reason</p>
-                  <p style="color:#4b5563;font-size:15px;line-height:1.7;margin:0;white-space:pre-line">%s</p>
-                </div>
-                """.formatted(escapeHtml(b.getRejectionReason()));
         return wrap(propertyName, """
                 <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 16px">
                   Hello <strong>%s</strong>,
@@ -494,7 +481,10 @@ public class EmailService {
                 <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 16px">
                   Thank you for your interest in staying with us.
                 </p>
-                %s
+                <p style="color:#4b5563;font-size:16px;line-height:1.7;margin:0 0 24px">
+                  Unfortunately, the selected dates are <strong>unavailable</strong>.
+                  Please visit our website to choose other available dates.
+                </p>
 
                 <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin-bottom:24px;text-align:center">
                   <p style="color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px">Booking Reference</p>
@@ -506,7 +496,6 @@ public class EmailService {
                 </p>
                 """.formatted(
                 escapeHtml(b.getGuestName()),
-                rejectionMessage,
                 b.getBookingReference()
         ));
     }
